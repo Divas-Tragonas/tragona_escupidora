@@ -1,0 +1,95 @@
+name: 📜 Generar Recap D&D
+
+# Se dispara manualmente desde la web (vía API) o desde la pestaña Actions de GitHub
+on:
+  workflow_dispatch:
+    inputs:
+      vod_url:
+        description: "URL del VOD de Twitch"
+        required: true
+        type: string
+      titulo:
+        description: "Título de la sesión (opcional — se genera automáticamente si se deja vacío)"
+        required: false
+        default: ""
+        type: string
+      idioma:
+        description: "Idioma del audio para Whisper"
+        required: false
+        default: "es"
+        type: choice
+        options:
+          - es
+          - en
+          - fr
+          - de
+          - pt
+          - it
+
+jobs:
+  generar-recap:
+    name: Generar recap desde VOD
+    runs-on: ubuntu-latest
+
+    # Permiso de escritura para que el job pueda hacer push al repositorio
+    permissions:
+      contents: write
+
+    steps:
+      # ── 1. Clonar el repositorio ──────────────────────────────────────
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+        with:
+          # Usar el token del repositorio para el checkout; el push posterior
+          # también usa GITHUB_TOKEN gracias al permiso contents: write
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Configurar Python ─────────────────────────────────────────
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: scripts/requirements.txt
+
+      # ── 3. Instalar ffmpeg ───────────────────────────────────────────
+      - name: Instalar ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -1
+
+      # ── 4. Instalar dependencias Python ──────────────────────────────
+      - name: Instalar dependencias Python
+        run: pip install -r scripts/requirements.txt
+
+      # ── 5. Ejecutar el generador de recap ────────────────────────────
+      - name: Generar recap
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          python scripts/generate_recap.py \
+            --url "${{ github.event.inputs.vod_url }}" \
+            --titulo "${{ github.event.inputs.titulo }}" \
+            --idioma "${{ github.event.inputs.idioma }}" \
+            --salida docs/recaps
+
+      # ── 6. Commit y push ─────────────────────────────────────────────
+      - name: Publicar recap en GitHub Pages
+        run: |
+          git config user.name  "Cronista de la Mazmorra"
+          git config user.email "actions@github.com"
+
+          # Añadir solo los ficheros que nos interesan (evitar subir temporales)
+          git add docs/recaps/ docs/recaps.json
+
+          # Comprobar si hay cambios antes de intentar el commit
+          if git diff --staged --quiet; then
+            echo "No hay cambios que commitear. El recap puede que ya existiera."
+            exit 0
+          fi
+
+          FECHA=$(date +"%Y-%m-%d")
+          git commit -m "📜 Nuevo recap: ${FECHA}"
+          git push

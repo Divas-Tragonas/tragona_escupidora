@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Audio descargado localmente (nunca commitear)
+*.mp3
+*.mp4
+*.m4a
+*.wav
+*.webm
+*.ogg
+*.part
+*.ytdl
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Directorios temporales del script
+audio_temp/
+segments/
+tmp/
+temp/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# Logs
+*.log
+logs/

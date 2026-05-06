@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tragona Escupidora — Recaps D&D</title>
+
+  <!-- Fuentes: Cinzel Decorative para el título épico, Cinzel para subtítulos, EB Garamond para el cuerpo -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- marked.js para renderizar el Markdown de los recaps -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    /* ── Variables de color: pergamino quemado + oro D&D ─────────────── */
+    :root {
+      --bg:          #0c0a06;
+      --bg-card:     #181208;
+      --bg-modal:    #120e07;
+      --border:      #6b4f1a;
+      --border-glow: #c9952a;
+      --gold:        #d4a017;
+      --gold-light:  #f0c040;
+      --text:        #c8b08a;
+      --text-dim:    #8a7258;
+      --text-bright: #e8d5b0;
+      --red:         #8b1a1a;
+      --red-light:   #c0392b;
+      --scrollbar:   #3a2a10;
+    }
+
+    /* ── Reset y base ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: "EB Garamond", Georgia, serif;
+      font-size: 18px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    /* Textura de fondo sutil */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(ellipse at 20% 20%, rgba(180, 120, 20, 0.04) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 80%, rgba(100, 50, 10, 0.06) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Scrollbar personalizado ──────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border); }
+
+    /* ── Layout principal ─────────────────────────────────────────────── */
+    .contenedor {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Cabecera ─────────────────────────────────────────────────────── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 2.5rem 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .logo-bloque { display: flex; flex-direction: column; gap: 0.25rem; }
+
+    .logo-titulo {
+      font-family: "Cinzel Decorative", serif;
+      font-size: 1.9rem;
+      font-weight: 700;
+      color: var(--gold-light);
+      text-shadow: 0 0 20px rgba(212, 160, 23, 0.4);
+      letter-spacing: 0.04em;
+    }
+
+    .logo-subtitulo {
+      font-family: "Cinzel", serif;
+      font-size: 0.85rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    /* ── Botones ──────────────────────────────────────────────────────── */
+    .btn {
+      font-family: "Cinzel", serif;
+      font-size: 0.85rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: none;
+    }
+
+    .btn-primario {
+      background: linear-gradient(135deg, #8b1a1a 0%, #5a0f0f 100%);
+      color: #f0d090;
+      padding: 0.65rem 1.4rem;
+      border: 1px solid #a02020;
+      box-shadow: 0 2px 8px rgba(139, 26, 26, 0.4), inset 0 1px 0 rgba(255,200,100,0.1);
+    }
+
+    .btn-primario:hover {
+      background: linear-gradient(135deg, #a02020 0%, #6b1212 100%);
+      box-shadow: 0 4px 16px rgba(139, 26, 26, 0.6), inset 0 1px 0 rgba(255,200,100,0.15);
+      transform: translateY(-1px);
+    }
+
+    .btn-primario:active { transform: translateY(0); }
+
+    .btn-secundario {
+      background: transparent;
+      color: var(--gold);
+      padding: 0.55rem 1rem;
+      border: 1px solid var(--border);
+    }
+
+    .btn-secundario:hover {
+      border-color: var(--border-glow);
+      color: var(--gold-light);
+      background: rgba(212, 160, 23, 0.05);
+    }
+
+    .btn-pequeño {
+      font-size: 0.75rem;
+      padding: 0.4rem 0.8rem;
+    }
+
+    /* ── Sección de lista de recaps ───────────────────────────────────── */
+    .seccion-recaps {
+      padding: 3rem 0 4rem;
+    }
+
+    .seccion-titulo {
+      font-family: "Cinzel", serif;
+      font-size: 0.8rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .seccion-titulo::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(to right, var(--border), transparent);
+    }
+
+    /* ── Grid de tarjetas ─────────────────────────────────────────────── */
+    .grid-recaps {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .tarjeta {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 1.75rem;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Línea decorativa superior en oro */
+    .tarjeta::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(to right, transparent, var(--gold), transparent);
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .tarjeta:hover {
+      border-color: var(--border-glow);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(201, 149, 42, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .tarjeta:hover::before { opacity: 1; }
+
+    .tarjeta-fecha {
+      font-family: "Cinzel", serif;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: 0.6rem;
+    }
+
+    .tarjeta-titulo {
+      font-family: "Cinzel", serif;
+      font-size: 1.1rem;
+      color: var(--gold-light);
+      margin-bottom: 0.8rem;
+      line-height: 1.4;
+    }
+
+    .tarjeta-resumen {
+      font-size: 0.95rem;
+      color: var(--text);
+      line-height: 1.6;
+      margin-bottom: 1.2rem;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .tarjeta-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      font-family: "Cinzel", serif;
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Estado vacío ─────────────────────────────────────────────────── */
+    .estado-vacio {
+      text-align: center;
+      padding: 5rem 2rem;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    .estado-vacio .icono { font-size: 3rem; margin-bottom: 1rem; opacity: 0.4; }
+
+    /* ── Spinner de carga ─────────────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid rgba(212,160,23,0.2);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: girar 0.7s linear infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes girar { to { transform: rotate(360deg); } }
+
+    /* ── Modales (capa compartida) ────────────────────────────────────── */
+    .fondo-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .fondo-modal.activo { display: flex; }
+
+    .modal {
+      background: var(--bg-modal);
+      border: 1px solid var(--border-glow);
+      border-radius: 2px;
+      padding: 2rem 2.25rem;
+      width: 100%;
+      max-width: 560px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(201,149,42,0.1);
+      position: relative;
+      animation: aparecer 0.2s ease;
+    }
+
+    @keyframes aparecer {
+      from { opacity: 0; transform: translateY(10px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .modal-titulo {
+      font-family: "Cinzel", serif;
+      font-size: 1.15rem;
+      color: var(--gold-light);
+      margin-bottom: 1.5rem;
+      letter-spacing: 0.05em;
+    }
+
+    .modal-cerrar {
+      position: absolute;
+      top: 1rem; right: 1.25rem;
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1.4rem;
+      cursor: pointer;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+
+    .modal-cerrar:hover { color: var(--text-bright); }
+
+    /* ── Formulario ───────────────────────────────────────────────────── */
+    .campo-grupo { margin-bottom: 1.25rem; }
+
+    .campo-label {
+      display: block;
+      font-family: "Cinzel", serif;
+      font-size: 0.78rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 0.4rem;
+    }
+
+    .campo-input, .campo-select {
+      width: 100%;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      font-family: "EB Garamond", serif;
+      font-size: 1rem;
+      padding: 0.6rem 0.8rem;
+      border-radius: 2px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .campo-input:focus, .campo-select:focus { border-color: var(--border-glow); }
+    .campo-input::placeholder { color: var(--text-dim); }
+
+    .campo-nota {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      margin-top: 0.35rem;
+      font-style: italic;
+    }
+
+    .separador-modal {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 1.5rem 0;
+    }
+
+    .campo-pat-fila {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-start;
+    }
+
+    .campo-pat-fila .campo-input { flex: 1; }
+
+    /* ── Mensajes de estado en el modal ───────────────────────────────── */
+    .mensaje {
+      padding: 0.7rem 0.9rem;
+      border-radius: 2px;
+      font-size: 0.9rem;
+      margin-top: 1rem;
+      display: none;
+    }
+
+    .mensaje.visible { display: block; }
+    .mensaje.exito { background: rgba(30,80,30,0.4); border: 1px solid #2d6a2d; color: #7fc47f; }
+    .mensaje.error { background: rgba(80,20,20,0.4); border: 1px solid #6a2020; color: #d47f7f; }
+    .mensaje.info  { background: rgba(30,50,80,0.4); border: 1px solid #204060; color: #7fafd4; }
+
+    /* ── Modal de lectura de recap (pantalla completa) ────────────────── */
+    .fondo-lectura {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      backdrop-filter: blur(6px);
+      z-index: 200;
+      overflow-y: auto;
+    }
+
+    .fondo-lectura.activo { display: block; }
+
+    .panel-lectura {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 3rem 2rem 6rem;
+      position: relative;
+      animation: aparecer 0.2s ease;
+    }
+
+    .lectura-cerrar {
+      position: fixed;
+      top: 1.25rem; right: 1.5rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: "Cinzel", serif;
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      border-radius: 2px;
+      z-index: 201;
+      transition: all 0.2s;
+    }
+
+    .lectura-cerrar:hover { border-color: var(--border-glow); color: var(--gold); }
+
+    /* ── Estilos para el Markdown renderizado ─────────────────────────── */
+    .contenido-md {
+      color: var(--text-bright);
+      font-size: 1.05rem;
+      line-height: 1.8;
+    }
+
+    .contenido-md h1 {
+      font-family: "Cinzel Decorative", serif;
+      color: var(--gold-light);
+      font-size: 1.9rem;
+      margin-bottom: 0.3rem;
+      text-shadow: 0 0 16px rgba(212,160,23,0.3);
+    }
+
+    .contenido-md > p:first-of-type {
+      color: var(--text-dim);
+      font-style: italic;
+      margin-bottom: 2.5rem;
+      font-size: 0.95rem;
+    }
+
+    .contenido-md h2 {
+      font-family: "Cinzel", serif;
+      color: var(--gold);
+      font-size: 1.25rem;
+      margin: 2.5rem 0 0.8rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--border);
+      letter-spacing: 0.04em;
+    }
+
+    .contenido-md h3 {
+      font-family: "Cinzel", serif;
+      color: var(--text-bright);
+      font-size: 1.05rem;
+      margin: 1.5rem 0 0.5rem;
+    }
+
+    .contenido-md ul, .contenido-md ol {
+      padding-left: 1.5rem;
+      margin: 0.5rem 0 1rem;
+    }
+
+    .contenido-md li { margin-bottom: 0.3rem; }
+
+    .contenido-md blockquote {
+      border-left: 3px solid var(--gold);
+      padding: 0.5rem 1rem 0.5rem 1.25rem;
+      margin: 1rem 0;
+      background: rgba(212,160,23,0.04);
+      border-radius: 0 2px 2px 0;
+      color: var(--text-bright);
+      font-style: italic;
+    }
+
+    .contenido-md hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2.5rem 0;
+    }
+
+    .contenido-md strong { color: var(--gold-light); font-weight: 600; }
+    .contenido-md em { color: var(--text-bright); }
+
+    .contenido-md code {
+      background: rgba(212,160,23,0.08);
+      padding: 0.1em 0.4em;
+      border-radius: 2px;
+      font-size: 0.9em;
+    }
+
+    .contenido-md a {
+      color: var(--gold);
+      text-decoration: none;
+      border-bottom: 1px dashed var(--border);
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .contenido-md a:hover { color: var(--gold-light); border-color: var(--gold); }
+
+    /* ── Barra de info en la lectura ──────────────────────────────────── */
+    .lectura-info {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Responsive ───────────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .logo-titulo { font-size: 1.4rem; }
+      header { flex-direction: column; align-items: flex-start; }
+      .modal { padding: 1.5rem; }
+      .panel-lectura { padding: 2rem 1rem 5rem; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="contenedor">
+    <!-- ── Cabecera ──────────────────────────────────────────────── -->
+    <header>
+      <div class="logo-bloque">
+        <h1 class="logo-titulo" id="titulo-campana">Tragona Escupidora</h1>
+        <p class="logo-subtitulo" id="desc-campana">Cargando…</p>
+      </div>
+      <button class="btn btn-primario" onclick="abrirModalGenerar()">
+        ✦ Nueva Sesión
+      </button>
+    </header>
+
+    <!-- ── Lista de recaps ──────────────────────────────────────── -->
+    <section class="seccion-recaps">
+      <p class="seccion-titulo">Crónicas de la campaña</p>
+      <div id="grid-recaps" class="grid-recaps">
+        <div class="estado-vacio">
+          <div class="icono">⚔</div>
+          <p>Cargando crónicas…</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- MODAL: Generar nuevo recap                                    -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <div class="fondo-modal" id="modal-generar" onclick="cerrarModalSiFondo(event, 'modal-generar')">
+    <div class="modal">
+      <button class="modal-cerrar" onclick="cerrarModal('modal-generar')" title="Cerrar">×</button>
+      <h2 class="modal-titulo">✦ Nueva Sesión</h2>
+
+      <form id="form-generar" onsubmit="enviarWorkflow(event)">
+        <!-- URL del VOD -->
+        <div class="campo-grupo">
+          <label class="campo-label" for="input-url">URL del VOD de Twitch *</label>
+          <input
+            class="campo-input"
+            id="input-url"
+            type="url"
+            placeholder="https://www.twitch.tv/videos/1234567890"
+            required
+          />
+        </div>
+
+        <!-- Título opcional -->
+        <div class="campo-grupo">
+          <label class="campo-label" for="input-titulo">Título de la sesión</label>
+          <input
+            class="campo-input"
+            id="input-titulo"
+            type="text"
+            placeholder="Se generará automáticamente si lo dejas vacío"
+          />
+        </div>
+
+        <!-- Idioma -->
+        <div class="campo-grupo">
+          <label class="campo-label" for="input-idioma">Idioma del audio</label>
+          <select class="campo-select" id="input-idioma">
+            <option value="es" selected>Español</option>
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+            <option value="de">Deutsch</option>
+            <option value="pt">Português</option>
+          </select>
+        </div>
+
+        <hr class="separador-modal" />
+
+        <!-- Personal Access Token -->
+        <div class="campo-grupo">
+          <label class="campo-label" for="input-pat">GitHub Personal Access Token *</label>
+          <div class="campo-pat-fila">
+            <input
+              class="campo-input"
+              id="input-pat"
+              type="password"
+              placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+            />
+            <button type="button" class="btn btn-secundario btn-pequeño" onclick="guardarPAT()">
+              Guardar
+            </button>
+          </div>
+          <p class="campo-nota">
+            Se guarda en tu localStorage (solo en este navegador).
+            Necesita el scope <code>workflow</code>.
+            <button type="button" class="btn btn-secundario btn-pequeño" style="margin-left:0.5rem; padding: 0.2rem 0.6rem; font-size:0.7rem;" onclick="borrarPAT()">
+              Borrar
+            </button>
+          </p>
+        </div>
+
+        <button type="submit" class="btn btn-primario" id="btn-disparar" style="width:100%; justify-content:center; margin-top:0.5rem;">
+          Generar Recap
+        </button>
+      </form>
+
+      <div class="mensaje" id="msg-generar"></div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- MODAL: Leer recap completo (pantalla completa)               -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <div class="fondo-lectura" id="modal-lectura">
+    <button class="lectura-cerrar" onclick="cerrarLectura()">← Volver</button>
+    <div class="panel-lectura">
+      <div id="lectura-info" class="lectura-info" style="display:none;">
+        <a id="lectura-vod" href="#" target="_blank" rel="noopener" class="btn btn-secundario btn-pequeño">
+          ▶ Ver VOD en Twitch
+        </a>
+      </div>
+      <div id="contenido-lectura" class="contenido-md">
+        <p>Cargando…</p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- JavaScript                                                    -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <script>
+    "use strict";
+
+    // ── Estado de la app ────────────────────────────────────────────
+    let CONFIG = {};
+    let RECAPS = [];
+
+    // ── Inicialización ──────────────────────────────────────────────
+    async function iniciar() {
+      try {
+        // Cargar configuración del repositorio
+        const resConfig = await fetch("config.json?" + Date.now());
+        CONFIG = await resConfig.json();
+
+        // Actualizar títulos de la cabecera
+        document.getElementById("titulo-campana").textContent = CONFIG.titulo_campana || "D&D Recaps";
+        document.title = (CONFIG.titulo_campana || "D&D Recaps") + " — Recaps";
+        document.getElementById("desc-campana").textContent = CONFIG.descripcion || "";
+
+        // Cargar lista de recaps
+        const resRecaps = await fetch("recaps.json?" + Date.now());
+        RECAPS = await resRecaps.json();
+        renderizarGrid(RECAPS);
+
+        // Restaurar PAT guardado
+        const pat = localStorage.getItem("dnd_recap_pat");
+        if (pat) {
+          document.getElementById("input-pat").value = pat;
+        }
+      } catch (err) {
+        document.getElementById("grid-recaps").innerHTML = `
+          <div class="estado-vacio">
+            <div class="icono">⚠</div>
+            <p>Error cargando datos: ${err.message}</p>
+          </div>`;
+      }
+    }
+
+    // ── Renderizado de la cuadrícula de recaps ──────────────────────
+    function renderizarGrid(recaps) {
+      const grid = document.getElementById("grid-recaps");
+
+      if (!recaps || recaps.length === 0) {
+        grid.innerHTML = `
+          <div class="estado-vacio">
+            <div class="icono">📜</div>
+            <p>Todavía no hay crónicas. Pulsa <strong>Nueva Sesión</strong> para generar la primera.</p>
+          </div>`;
+        return;
+      }
+
+      grid.innerHTML = recaps.map((recap, idx) => `
+        <article class="tarjeta" onclick="abrirRecap(${idx})">
+          <p class="tarjeta-fecha">${formatearFecha(recap.fecha)}</p>
+          <h2 class="tarjeta-titulo">${escaparHtml(recap.titulo)}</h2>
+          ${recap.resumen ? `<p class="tarjeta-resumen">${escaparHtml(recap.resumen)}</p>` : ""}
+          <div class="tarjeta-footer">
+            <span>Leer crónica →</span>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    // ── Abrir recap en modo lectura ─────────────────────────────────
+    async function abrirRecap(idx) {
+      const recap = RECAPS[idx];
+      const panel = document.getElementById("modal-lectura");
+      const contenido = document.getElementById("contenido-lectura");
+      const info = document.getElementById("lectura-info");
+      const enlaceVod = document.getElementById("lectura-vod");
+
+      // Mostrar estado de carga
+      contenido.innerHTML = '<div style="text-align:center; padding:3rem;"><span class="spinner"></span></div>';
+      panel.classList.add("activo");
+      document.body.style.overflow = "hidden";
+
+      try {
+        const res = await fetch(recap.archivo + "?" + Date.now());
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        let markdown = await res.text();
+
+        // Eliminar el frontmatter YAML (entre --- ... ---) antes de renderizar
+        markdown = markdown.replace(/^---[\s\S]*?---\n/, "");
+
+        contenido.innerHTML = marked.parse(markdown);
+
+        // Mostrar enlace al VOD si existe
+        if (recap.vod_url) {
+          enlaceVod.href = recap.vod_url;
+          info.style.display = "flex";
+        } else {
+          info.style.display = "none";
+        }
+      } catch (err) {
+        contenido.innerHTML = `<p style="color:#d47f7f;">Error cargando el recap: ${err.message}</p>`;
+      }
+    }
+
+    function cerrarLectura() {
+      document.getElementById("modal-lectura").classList.remove("activo");
+      document.body.style.overflow = "";
+    }
+
+    // Cerrar con Escape
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        cerrarLectura();
+        cerrarModal("modal-generar");
+      }
+    });
+
+    // ── Modales de generación ───────────────────────────────────────
+    function abrirModalGenerar() {
+      limpiarMensaje("msg-generar");
+      document.getElementById("modal-generar").classList.add("activo");
+    }
+
+    function cerrarModal(id) {
+      document.getElementById(id).classList.remove("activo");
+    }
+
+    function cerrarModalSiFondo(event, id) {
+      if (event.target.id === id) cerrarModal(id);
+    }
+
+    // ── Gestión del PAT ─────────────────────────────────────────────
+    function guardarPAT() {
+      const pat = document.getElementById("input-pat").value.trim();
+      if (!pat) {
+        mostrarMensaje("msg-generar", "Introduce un PAT antes de guardarlo.", "error");
+        return;
+      }
+      localStorage.setItem("dnd_recap_pat", pat);
+      mostrarMensaje("msg-generar", "Token guardado en este navegador.", "exito");
+    }
+
+    function borrarPAT() {
+      localStorage.removeItem("dnd_recap_pat");
+      document.getElementById("input-pat").value = "";
+      mostrarMensaje("msg-generar", "Token eliminado.", "info");
+    }
+
+    // ── Disparar el workflow de GitHub Actions ──────────────────────
+    async function enviarWorkflow(event) {
+      event.preventDefault();
+
+      const url   = document.getElementById("input-url").value.trim();
+      const titulo = document.getElementById("input-titulo").value.trim();
+      const idioma = document.getElementById("input-idioma").value;
+      const pat   = document.getElementById("input-pat").value.trim();
+
+      if (!pat) {
+        mostrarMensaje("msg-generar", "Necesitas introducir tu Personal Access Token.", "error");
+        return;
+      }
+
+      if (!CONFIG.github_owner || CONFIG.github_owner === "TU_USUARIO_GITHUB") {
+        mostrarMensaje("msg-generar", "Edita docs/config.json con tu usuario y nombre de repositorio de GitHub.", "error");
+        return;
+      }
+
+      const btn = document.getElementById("btn-disparar");
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Disparando…';
+      limpiarMensaje("msg-generar");
+
+      const apiUrl = `https://api.github.com/repos/${CONFIG.github_owner}/${CONFIG.github_repo}/actions/workflows/${CONFIG.workflow_id}/dispatches`;
+
+      try {
+        const res = await fetch(apiUrl, {
+          method: "POST",
+          headers: {
+            "Authorization": `token ${pat}`,
+            "Accept": "application/vnd.github.v3+json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ref: "main",
+            inputs: { vod_url: url, titulo, idioma },
+          }),
+        });
+
+        if (res.status === 204) {
+          // Guardar PAT automáticamente si el disparo fue exitoso
+          localStorage.setItem("dnd_recap_pat", pat);
+          mostrarMensaje(
+            "msg-generar",
+            "✓ Workflow disparado. En ~10-20 minutos el recap aparecerá aquí. Refresca la página para verlo.",
+            "exito"
+          );
+          document.getElementById("form-generar").reset();
+          // Restaurar el PAT en el input
+          document.getElementById("input-pat").value = pat;
+        } else {
+          const cuerpo = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
+          const mensajeError = cuerpo.message || `HTTP ${res.status}`;
+          throw new Error(mensajeError);
+        }
+      } catch (err) {
+        mostrarMensaje("msg-generar", `Error: ${err.message}. Comprueba el token y que el repo esté configurado.`, "error");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = "Generar Recap";
+      }
+    }
+
+    // ── Utilidades ──────────────────────────────────────────────────
+    function mostrarMensaje(id, texto, tipo) {
+      const el = document.getElementById(id);
+      el.textContent = texto;
+      el.className = `mensaje ${tipo} visible`;
+    }
+
+    function limpiarMensaje(id) {
+      const el = document.getElementById(id);
+      el.className = "mensaje";
+      el.textContent = "";
+    }
+
+    function escaparHtml(texto) {
+      return (texto || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function formatearFecha(fechaISO) {
+      if (!fechaISO) return "";
+      const [anio, mes, dia] = fechaISO.split("-");
+      const meses = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+      return `${parseInt(dia)} ${meses[parseInt(mes) - 1]} ${anio}`;
+    }
+
+    // ── Arrancar ────────────────────────────────────────────────────
+    iniciar();
+  </script>
+</body>
+</html>

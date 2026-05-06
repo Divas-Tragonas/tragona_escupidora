@@ -1,0 +1,7 @@
+{
+  "github_owner": "TU_USUARIO_GITHUB",
+  "github_repo": "TragonaEscupidora",
+  "workflow_id": "generate-recap.yml",
+  "titulo_campana": "Tragona Escupidora",
+  "descripcion": "Recaps automáticos de nuestras sesiones de D&D"
+}
