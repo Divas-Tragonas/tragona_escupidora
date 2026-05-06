@@ -92,4 +92,4 @@ jobs:
 
           FECHA=$(date +"%Y-%m-%d")
           git commit -m "📜 Nuevo recap: ${FECHA}"
-          git push
+          git push origin master

@@ -45,8 +45,8 @@ git init
 git add .
 git commit -m "Primer commit: estructura base"
 git remote add origin https://github.com/TU_USUARIO/TragonaEscupidora.git
-git branch -M main
-git push -u origin main
+git branch -M master
+git push -u origin master
 ```
 
 > ⚠️ **Importante:** el workflow `generate-recap.yml` debe estar en la rama `main` antes de poder dispararlo vía API.
