@@ -579,10 +579,16 @@
             </div>
           </div>
 
-          <p class="note">
-            Sube el archivo de audio. Si dividiste en partes con ffmpeg, sube primero <code>parte_00.mp3</code>.
-            Cuando termine te pedirá la siguiente parte.
-          </p>
+          <div style="display:flex; gap:0.4rem; margin-bottom:1rem;">
+            <button class="btn btn-gold btn-sm" id="tab-upload" onclick="switchTab('upload')" style="border-color:var(--border-glow); color:var(--gold-light);">🎵 Subir audio (Groq)</button>
+            <button class="btn btn-gold btn-sm" id="tab-paste"  onclick="switchTab('paste')"  style="">📋 Pegar transcripción</button>
+          </div>
+
+          <div id="panel-upload">
+            <p class="note">
+              Sube el archivo de audio. Si dividiste en partes con ffmpeg, sube primero <code>parte_00.mp3</code>.
+              Cuando termine te pedirá la siguiente parte.
+            </p>
 
           <label class="upload-zone" id="upload-zone" for="input-audio">
             <input type="file" id="input-audio" accept="audio/*,.mp3,.m4a,.wav,.ogg"
@@ -598,6 +604,28 @@
           </div>
 
           <div class="msg" id="msg2"></div>
+
+          </div><!-- /panel-upload -->
+
+          <div id="panel-paste" style="display:none;">
+            <p class="note">
+              Pega aquí el contenido del fichero <code>transcripcio_YYYY-MM-DD.txt</code> generado
+              por el script local de Whisper (o cualquier otra fuente).
+            </p>
+            <div class="fg">
+              <label class="fl" for="manual-transcript">Transcripción</label>
+              <textarea class="fta" id="manual-transcript"
+                style="min-height:200px;"
+                placeholder="Pega aquí el texto de la transcripción…"
+                oninput="onManualTranscriptChange()"></textarea>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-red" id="btn-use-transcript" onclick="useManualTranscript()" disabled>
+                Usar esta transcripción →
+              </button>
+            </div>
+            <div class="msg" id="msg2b"></div>
+          </div><!-- /panel-paste -->
 
           <div id="part-done-box" style="display:none; margin-top:0.9rem;">
             <p class="fn" id="part-done-info"></p>
@@ -1098,6 +1126,32 @@ TRANSCRIPCIÓN:
     }
   }
 
+  function switchTab(tab) {
+    const isUpload = tab === "upload";
+    document.getElementById("panel-upload").style.display = isUpload ? "block" : "none";
+    document.getElementById("panel-paste").style.display  = isUpload ? "none"  : "block";
+    document.getElementById("tab-upload").style.borderColor = isUpload ? "var(--border-glow)" : "";
+    document.getElementById("tab-upload").style.color       = isUpload ? "var(--gold-light)"  : "";
+    document.getElementById("tab-paste").style.borderColor  = isUpload ? "" : "var(--border-glow)";
+    document.getElementById("tab-paste").style.color        = isUpload ? "" : "var(--gold-light)";
+  }
+
+  function onManualTranscriptChange() {
+    const ok = document.getElementById("manual-transcript").value.trim().length > 50;
+    document.getElementById("btn-use-transcript").disabled = !ok;
+  }
+
+  function useManualTranscript() {
+    const texto = document.getElementById("manual-transcript").value.trim();
+    if (texto.length < 50) return;
+    transcriptionParts = [texto];
+    transcription = texto;
+    const words = texto.split(/\s+/).length;
+    markDone(2);
+    activateStep(3);
+    showPreview(texto, words);
+  }
+
   function uploadNextPart() {
     document.getElementById("part-done-box").style.display = "none";
     document.getElementById("prog-wrap").style.display = "none";
@@ -1266,6 +1320,10 @@ TRANSCRIPCIÓN:
     document.getElementById("saved-box").style.display = "none";
     document.getElementById("part-done-box").style.display = "none";
     document.getElementById("input-audio").value = "";
+    document.getElementById("manual-transcript").value = "";
+    document.getElementById("btn-use-transcript").disabled = true;
+    clearMsg("msg2b");
+    switchTab("upload");
     document.getElementById("btn-next3").disabled = true;
     onUrlChange();
     ["msg1","msg2","msg3","msg4"].forEach(clearMsg);
