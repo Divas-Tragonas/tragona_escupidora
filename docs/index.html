@@ -533,8 +533,21 @@
           </div>
           <p class="fn">El archivo se guardará como <code>audio.mp3</code> donde ejecutes el comando.</p>
 
-          <div class="btn-row">
-            <button class="btn btn-red" onclick="confirmStep1()">Ya descargué el audio →</button>
+          <div style="margin-top:1rem;">
+            <label class="fl">Si la sesión dura más de 90 minutos — divide el audio</label>
+            <p class="fn" style="margin-bottom:0.4rem;">
+              Groq free tier solo procesa 2 h/hora. Este comando divide el audio en partes de 90 min con metadatos correctos.
+              Luego subirás cada parte por separado.
+            </p>
+            <div class="cmd-row">
+              <div class="cmd">ffmpeg -i audio.mp3 -f segment -segment_time 5400 -c copy -reset_timestamps 1 parte_%02d.mp3</div>
+              <button class="btn btn-gold btn-sm" onclick="copySplitCmd(this)">Copiar</button>
+            </div>
+            <p class="fn">Genera <code>parte_00.mp3</code>, <code>parte_01.mp3</code>… Sube cada una por separado en el paso 2.</p>
+          </div>
+
+          <div class="btn-row" style="margin-top:1.25rem;">
+            <button class="btn btn-red" onclick="confirmStep1()">Ya tengo el audio →</button>
           </div>
           <div class="msg" id="msg1"></div>
         </div>
@@ -567,8 +580,8 @@
           </div>
 
           <p class="note">
-            Sube el <code>audio.mp3</code> descargado. Para sesiones largas lo troceamos automáticamente.
-            El tier gratuito de Groq procesa hasta 2 h/hora — si tu sesión es más larga, guardamos el progreso automáticamente.
+            Sube el archivo de audio. Si dividiste en partes con ffmpeg, sube primero <code>parte_00.mp3</code>.
+            Cuando termine te pedirá la siguiente parte.
           </p>
 
           <label class="upload-zone" id="upload-zone" for="input-audio">
@@ -585,6 +598,14 @@
           </div>
 
           <div class="msg" id="msg2"></div>
+
+          <div id="part-done-box" style="display:none; margin-top:0.9rem;">
+            <p class="fn" id="part-done-info"></p>
+            <div class="btn-row">
+              <button class="btn btn-gold" onclick="uploadNextPart()">Subir siguiente parte →</button>
+              <button class="btn btn-red" onclick="allPartsDone()">No hay más partes →</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -809,6 +830,7 @@ TRANSCRIPCIÓN:
   let savedId = null;
   let activeStep = 1;
   let pendingFile = null;
+  let transcriptionParts = [];
 
   // ── Partial transcription state (for Groq rate-limit recovery) ───────
   const PARTIAL_KEY = "dnd_transcription_partial";
@@ -980,6 +1002,15 @@ TRANSCRIPCIÓN:
     }
   }
 
+  function copySplitCmd(btn) {
+    navigator.clipboard.writeText(
+      "ffmpeg -i audio.mp3 -f segment -segment_time 5400 -c copy -reset_timestamps 1 parte_%02d.mp3"
+    ).then(() => {
+      btn.textContent = "✓";
+      setTimeout(() => btn.textContent = "Copiar", 2000);
+    });
+  }
+
   function copyCmd() {
     const txt = document.getElementById("cmd-dl").textContent;
     navigator.clipboard.writeText(txt).then(() => {
@@ -1038,36 +1069,48 @@ TRANSCRIPCIÓN:
 
   async function runTranscription(file, gk, startChunk, prevParts) {
     document.getElementById("prog-wrap").style.display = "block";
+    document.getElementById("part-done-box").style.display = "none";
     clearMsg("msg2");
 
     try {
       const texto = await transcribeAudio(file, gk, startChunk, prevParts);
-      transcription = texto;
-      const words = texto.split(/\s+/).length;
-      showMsg("msg2", `✓ Transcripción completada: ${words.toLocaleString()} palabras.`, "ok");
-      markDone(2);
-      activateStep(3);
-      showPreview(texto, words);
+      transcriptionParts.push(texto);
+      transcription = transcriptionParts.join("\n\n");
+
+      const words = transcription.split(/\s+/).length;
+      const partN  = transcriptionParts.length;
+      showMsg("msg2", `✓ Parte ${partN} transcrita. Total acumulado: ${words.toLocaleString()} palabras.`, "ok");
+
+      document.getElementById("part-done-info").textContent =
+        `Parte ${partN} lista. ¿Hay más archivos de audio (parte_0${partN}.mp3…)?`;
+      document.getElementById("part-done-box").style.display = "block";
     } catch (e) {
       document.getElementById("prog-wrap").style.display = "none";
       if (e.isRateLimit) {
-        showMsg("msg2", e.message, "info");
-        // Show resume banner for next time
-        const partial = loadPartial();
-        if (partial) {
-          const pct = Math.round(partial.chunksDone / partial.totalChunks * 100);
-          document.getElementById("resume-info").textContent =
-            `${pct}% completado (${partial.chunksDone}/${partial.totalChunks} fragmentos), guardado ahora.`;
-          document.getElementById("resume-banner").style.display = "block";
-        }
+        showMsg("msg2", e.message + " Divide el audio con el comando ffmpeg del paso 1 y vuelve a intentarlo.", "err");
       } else {
         let msg = e.message;
         if (msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("cors")) {
-          msg += " (puede ser un error CORS — intenta desde localhost o usa el script Python)";
+          msg += " (puede ser CORS — intenta desde localhost o usa el script Python)";
         }
         showMsg("msg2", `Error: ${msg}`, "err");
       }
     }
+  }
+
+  function uploadNextPart() {
+    document.getElementById("part-done-box").style.display = "none";
+    document.getElementById("prog-wrap").style.display = "none";
+    document.getElementById("upload-fname").textContent = "";
+    document.getElementById("input-audio").value = "";
+    clearMsg("msg2");
+  }
+
+  function allPartsDone() {
+    document.getElementById("part-done-box").style.display = "none";
+    markDone(2);
+    activateStep(3);
+    showPreview(transcription, transcription.split(/\s+/).length);
   }
 
   async function transcribeAudio(file, key, startChunk = 0, prevParts = []) {
@@ -1196,6 +1239,7 @@ TRANSCRIPCIÓN:
 
   function resetWizard() {
     transcription = "";
+    transcriptionParts = [];
     ["vod-url","ses-titulo","claude-resp","final-titulo"].forEach(id => {
       document.getElementById(id).value = "";
     });
@@ -1203,6 +1247,7 @@ TRANSCRIPCIÓN:
     document.getElementById("prog-wrap").style.display = "none";
     document.getElementById("preview-box").style.display = "none";
     document.getElementById("saved-box").style.display = "none";
+    document.getElementById("part-done-box").style.display = "none";
     document.getElementById("input-audio").value = "";
     document.getElementById("btn-next3").disabled = true;
     onUrlChange();
