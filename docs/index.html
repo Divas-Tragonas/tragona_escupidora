@@ -555,8 +555,20 @@
             </p>
           </div>
 
+          <div id="resume-banner" style="display:none;">
+            <p class="note" style="border-left-color:var(--gold); color:var(--gold);">
+              <strong>Transcripción parcial guardada</strong> — <span id="resume-info"></span><br/>
+              Sube el mismo archivo para continuar desde donde se quedó, o empieza de cero.
+            </p>
+            <div class="btn-row" style="margin-top:0.5rem;">
+              <button class="btn btn-gold btn-sm" onclick="resumeFromPartial()">Continuar →</button>
+              <button class="btn btn-gold btn-sm" onclick="discardPartial()">Empezar de cero</button>
+            </div>
+          </div>
+
           <p class="note">
-            Sube el <code>audio.mp3</code> descargado. Para sesiones largas lo troceamos automáticamente en fragmentos de 24 MB.
+            Sube el <code>audio.mp3</code> descargado. Para sesiones largas lo troceamos automáticamente.
+            El tier gratuito de Groq procesa hasta 2 h/hora — si tu sesión es más larga, guardamos el progreso automáticamente.
           </p>
 
           <label class="upload-zone" id="upload-zone" for="input-audio">
@@ -796,6 +808,22 @@ TRANSCRIPCIÓN:
   let currentMd = "";
   let savedId = null;
   let activeStep = 1;
+  let pendingFile = null;
+
+  // ── Partial transcription state (for Groq rate-limit recovery) ───────
+  const PARTIAL_KEY = "dnd_transcription_partial";
+
+  function savePartial(parts, chunksDone, totalChunks) {
+    localStorage.setItem(PARTIAL_KEY, JSON.stringify({ parts, chunksDone, totalChunks, savedAt: Date.now() }));
+  }
+
+  function loadPartial() {
+    try { return JSON.parse(localStorage.getItem(PARTIAL_KEY) || "null"); } catch (_) { return null; }
+  }
+
+  function clearPartial() {
+    localStorage.removeItem(PARTIAL_KEY);
+  }
 
   // ── Boot ─────────────────────────────────────────────────────────────
   async function boot() {
@@ -814,6 +842,16 @@ TRANSCRIPCIÓN:
 
     const gk = localStorage.getItem("dnd_groq_key") || "";
     if (gk) document.getElementById("in-groq").value = gk;
+
+    // Show resume banner if there's a saved partial transcription
+    const partial = loadPartial();
+    if (partial && partial.chunksDone > 0 && partial.chunksDone < partial.totalChunks) {
+      const pct    = Math.round(partial.chunksDone / partial.totalChunks * 100);
+      const minAgo = Math.round((Date.now() - partial.savedAt) / 60000);
+      document.getElementById("resume-info").textContent =
+        `${pct}% completado (${partial.chunksDone}/${partial.totalChunks} fragmentos), guardado hace ${minAgo} min.`;
+      document.getElementById("resume-banner").style.display = "block";
+    }
 
     // Drag & drop
     const zone = document.getElementById("upload-zone");
@@ -968,33 +1006,77 @@ TRANSCRIPCIÓN:
 
     document.getElementById("upload-fname").textContent =
       `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+
+    // Check for saved partial transcription
+    const partial = loadPartial();
+    if (partial && partial.chunksDone > 0 && partial.chunksDone < partial.totalChunks) {
+      pendingFile = file;
+      const pct     = Math.round(partial.chunksDone / partial.totalChunks * 100);
+      const minAgo  = Math.round((Date.now() - partial.savedAt) / 60000);
+      document.getElementById("resume-info").textContent =
+        `${pct}% completado (${partial.chunksDone}/${partial.totalChunks} fragmentos), guardado hace ${minAgo} min.`;
+      document.getElementById("resume-banner").style.display = "block";
+      return;
+    }
+
+    await runTranscription(file, gk, 0, []);
+  }
+
+  async function resumeFromPartial() {
+    const partial = loadPartial();
+    const gk = localStorage.getItem("dnd_groq_key");
+    document.getElementById("resume-banner").style.display = "none";
+    await runTranscription(pendingFile, gk, partial.chunksDone, partial.parts);
+  }
+
+  function discardPartial() {
+    clearPartial();
+    document.getElementById("resume-banner").style.display = "none";
+    const gk = localStorage.getItem("dnd_groq_key");
+    runTranscription(pendingFile, gk, 0, []);
+  }
+
+  async function runTranscription(file, gk, startChunk, prevParts) {
     document.getElementById("prog-wrap").style.display = "block";
     clearMsg("msg2");
 
     try {
-      transcription = await transcribeAudio(file, gk);
-      const words = transcription.split(/\s+/).length;
+      const texto = await transcribeAudio(file, gk, startChunk, prevParts);
+      transcription = texto;
+      const words = texto.split(/\s+/).length;
       showMsg("msg2", `✓ Transcripción completada: ${words.toLocaleString()} palabras.`, "ok");
       markDone(2);
       activateStep(3);
-      showPreview(transcription, words);
+      showPreview(texto, words);
     } catch (e) {
-      let msg = e.message;
-      if (msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("cors")) {
-        msg += " (puede ser un error CORS — prueba desde un servidor local o usa el script Python como alternativa)";
-      }
-      showMsg("msg2", `Error: ${msg}`, "err");
       document.getElementById("prog-wrap").style.display = "none";
+      if (e.isRateLimit) {
+        showMsg("msg2", e.message, "info");
+        // Show resume banner for next time
+        const partial = loadPartial();
+        if (partial) {
+          const pct = Math.round(partial.chunksDone / partial.totalChunks * 100);
+          document.getElementById("resume-info").textContent =
+            `${pct}% completado (${partial.chunksDone}/${partial.totalChunks} fragmentos), guardado ahora.`;
+          document.getElementById("resume-banner").style.display = "block";
+        }
+      } else {
+        let msg = e.message;
+        if (msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("cors")) {
+          msg += " (puede ser un error CORS — intenta desde localhost o usa el script Python)";
+        }
+        showMsg("msg2", `Error: ${msg}`, "err");
+      }
     }
   }
 
-  async function transcribeAudio(file, key) {
+  async function transcribeAudio(file, key, startChunk = 0, prevParts = []) {
     const CHUNK = 24 * 1024 * 1024;
     const lang  = document.getElementById("ses-idioma").value;
     const n     = Math.ceil(file.size / CHUNK);
-    const parts = [];
+    const parts = [...prevParts];
 
-    for (let i = 0; i < n; i++) {
+    for (let i = startChunk; i < n; i++) {
       setProgress(i, n);
       const blob = file.slice(i * CHUNK, Math.min((i + 1) * CHUNK, file.size));
       const fd   = new FormData();
@@ -1004,21 +1086,41 @@ TRANSCRIPCIÓN:
       fd.append("response_format", "text");
 
       let tries = 3;
+      let succeeded = false;
       while (tries-- > 0) {
         const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
           method: "POST",
           headers: { "Authorization": `Bearer ${key}` },
           body: fd
         });
-        if (res.ok) { parts.push((await res.text()).trim()); break; }
-        const err = await res.json().catch(() => ({}));
-        if (tries === 0) throw new Error(err.error?.message || `HTTP ${res.status}`);
+
+        if (res.ok) { parts.push((await res.text()).trim()); succeeded = true; break; }
+
+        const errData = await res.json().catch(() => ({}));
+        const errMsg  = errData.error?.message || `HTTP ${res.status}`;
+
+        // Rate limit: ASPH limit or 429
+        if (res.status === 429 || (res.status === 400 && errMsg.includes("ASPH"))) {
+          savePartial(parts, i, n);
+          const pct = Math.round(i / n * 100);
+          const rlErr = new Error(
+            `Límite de Groq alcanzado (${pct}% completado, fragmento ${i + 1}/${n}). ` +
+            `Progreso guardado automáticamente. ` +
+            `Espera ~60 minutos y sube el mismo archivo para continuar.`
+          );
+          rlErr.isRateLimit = true;
+          throw rlErr;
+        }
+
+        if (tries === 0) throw new Error(errMsg);
         await sleep(3000);
       }
 
+      if (!succeeded) break;
       if (i < n - 1) await sleep(1500);
     }
 
+    clearPartial();
     setProgress(n, n);
     return parts.join("\n\n");
   }
