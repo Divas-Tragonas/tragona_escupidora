@@ -1113,6 +1113,22 @@ TRANSCRIPCIÓN:
     showPreview(transcription, transcription.split(/\s+/).length);
   }
 
+  async function stripId3(blob) {
+    // MP3 files from yt-dlp carry an ID3v2 header declaring the TOTAL file duration.
+    // When we byte-slice the file into chunks, chunk 0 still has that header, so Groq
+    // counts the FULL duration (e.g. 10869 s) against the ASPH quota even though the
+    // chunk only contains ~22 min of audio. Stripping the ID3 tag makes Groq measure
+    // actual audio content instead.
+    const header = await blob.slice(0, 10).arrayBuffer();
+    const v = new Uint8Array(header);
+    if (v[0] === 0x49 && v[1] === 0x44 && v[2] === 0x33) { // "ID3"
+      const size = ((v[6] & 0x7F) << 21) | ((v[7] & 0x7F) << 14) |
+                   ((v[8] & 0x7F) << 7)  |  (v[9] & 0x7F);
+      return blob.slice(10 + size);
+    }
+    return blob;
+  }
+
   async function transcribeAudio(file, key, startChunk = 0, prevParts = []) {
     const CHUNK = 24 * 1024 * 1024;
     const lang  = document.getElementById("ses-idioma").value;
@@ -1121,7 +1137,8 @@ TRANSCRIPCIÓN:
 
     for (let i = startChunk; i < n; i++) {
       setProgress(i, n);
-      const blob = file.slice(i * CHUNK, Math.min((i + 1) * CHUNK, file.size));
+      const raw  = file.slice(i * CHUNK, Math.min((i + 1) * CHUNK, file.size));
+      const blob = await stripId3(raw);
       const fd   = new FormData();
       fd.append("file", new File([blob], "audio.mp3", { type: "audio/mpeg" }));
       fd.append("model", "whisper-large-v3");
