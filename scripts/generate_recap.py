@@ -34,7 +34,7 @@ import assemblyai as aai
 # DESCÀRREGA D'ÀUDIO
 # ──────────────────────────────────────────────
 
-def descargar_audio(url_vod: str, directorio_temp: Path) -> Path:
+def descargar_audio(url_vod: str, directorio_temp: Path, fitxer_cookies: str | None = None) -> Path:
     ruta_salida = directorio_temp / "audio.mp3"
 
     opciones_ydl = {
@@ -48,6 +48,10 @@ def descargar_audio(url_vod: str, directorio_temp: Path) -> Path:
         "quiet": False,
         "no_warnings": False,
     }
+
+    if fitxer_cookies:
+        opciones_ydl["cookiefile"] = fitxer_cookies
+        print(f"    Usant cookies de: {fitxer_cookies}")
 
     print(f"[1/2] Descarregant àudio de: {url_vod}")
     with yt_dlp.YoutubeDL(opciones_ydl) as ydl:
@@ -117,22 +121,26 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Transcriu sessions de D&D des de VODs de Twitch amb AssemblyAI."
     )
-    parser.add_argument("--url",    required=True, help="URL del VOD de Twitch")
-    parser.add_argument("--titol",  default="",    help="Títol de la sessió (opcional)")
-    parser.add_argument("--idioma", default="ca",  help="Codi d'idioma per a AssemblyAI (default: ca)")
-    parser.add_argument("--salida", default="docs/transcripts", help="Directori on desar la transcripció")
+    parser.add_argument("--url",     required=True, help="URL del VOD de Twitch/YouTube")
+    parser.add_argument("--titol",   default="",    help="Títol de la sessió (opcional)")
+    parser.add_argument("--idioma",  default="ca",  help="Codi d'idioma per a AssemblyAI (default: ca)")
+    parser.add_argument("--salida",  default="docs/transcripts", help="Directori on desar la transcripció")
+    parser.add_argument("--cookies", default="",    help="Fitxer Netscape de cookies per a yt-dlp (útil per YouTube)")
     args = parser.parse_args()
 
     if not os.environ.get("ASSEMBLYAI_API_KEY"):
         print("Error: la variable d'entorn ASSEMBLYAI_API_KEY no està configurada.", file=sys.stderr)
         sys.exit(1)
 
+    # Cookies: argument explícit > variable d'entorn YTDLP_COOKIES_FILE
+    fitxer_cookies = args.cookies or os.environ.get("YTDLP_COOKIES_FILE", "") or None
+
     dir_salida = Path(args.salida)
     dir_salida.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="dnd_transcript_") as tmp:
         tmp_path = Path(tmp)
-        ruta_audio = descargar_audio(args.url, tmp_path)
+        ruta_audio = descargar_audio(args.url, tmp_path, fitxer_cookies)
         transcripcio = transcribir(ruta_audio, args.idioma)
 
     fecha = datetime.now().strftime("%Y-%m-%d")

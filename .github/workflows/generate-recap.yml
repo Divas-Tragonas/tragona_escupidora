@@ -56,6 +56,12 @@ jobs:
       - name: Instalar dependències Python
         run: pip install -r scripts/requirements.txt
 
+      - name: Preparar cookies de YouTube (opcional)
+        if: ${{ secrets.YTDLP_COOKIES != '' }}
+        run: |
+          echo "${{ secrets.YTDLP_COOKIES }}" > /tmp/yt_cookies.txt
+          echo "YTDLP_COOKIES_FILE=/tmp/yt_cookies.txt" >> $GITHUB_ENV
+
       - name: Transcriure sessió
         id: transcriure
         env:
