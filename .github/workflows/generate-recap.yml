@@ -48,6 +48,11 @@ jobs:
           cache: "pip"
           cache-dependency-path: scripts/requirements.txt
 
+      - name: Configurar Node.js (per yt-dlp JS challenge solving)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Instalar ffmpeg
         run: |
           sudo apt-get update -qq
