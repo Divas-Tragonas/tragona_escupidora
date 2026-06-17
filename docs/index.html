@@ -463,9 +463,10 @@
         <span class="logo-sub" id="el-sub">Recaps D&D</span>
       </div>
       <nav class="nav-tabs">
-        <button class="nav-tab on"  id="tab-recaps"  onclick="showView('recaps')">📜 Crónicas</button>
-        <button class="nav-tab"     id="tab-wizard"  onclick="showView('wizard')">✦ Nueva Sesión</button>
-        <button class="nav-tab"     id="tab-config"  onclick="showView('config')">⚙ Config</button>
+        <button class="nav-tab on"  id="tab-recaps"        onclick="showView('recaps')">📜 Crònica</button>
+        <button class="nav-tab"     id="tab-transcripts"   onclick="showView('transcripts')">📄 Transcripcions</button>
+        <button class="nav-tab"     id="tab-wizard"        onclick="showView('wizard')">✦ Nova Sessió</button>
+        <button class="nav-tab"     id="tab-config"        onclick="showView('config')">⚙ Config</button>
       </nav>
     </div>
   </header>
@@ -482,66 +483,48 @@
     </div>
   </div>
 
+  <!-- ══════════════════════ VISTA: TRANSCRIPCIONS ══════════════════════ -->
+  <div class="vista" id="vista-transcripts">
+    <div class="wrap">
+      <section class="seccion">
+        <p class="sec-titulo">Transcripcions</p>
+        <div class="grid" id="grid-transcripts">
+          <div class="empty"><div class="empty-icon">📄</div><p>Carregant…</p></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
   <!-- ══════════════════════ VISTA: WIZARD ══════════════════════ -->
   <div class="vista" id="vista-wizard">
     <div class="wrap wizard-wrap">
       <h2 class="view-title">✦ Nova Sessió</h2>
 
-      <!-- ── Mode Automàtic ── -->
+      <!-- ── Pas 0: Transcripció automàtica ── -->
       <div class="paso on" id="auto-mode-box" style="border-color:var(--border-glow); margin-bottom:1.5rem;">
         <div class="paso-head" style="cursor:default; background:rgba(212,160,23,0.04);">
           <span class="paso-num" style="border-color:var(--gold); color:var(--gold-light); background:rgba(212,160,23,0.14);">★</span>
-          <span class="paso-label" style="color:var(--gold-light);">Mode Automàtic — URL → Recap</span>
+          <span class="paso-label" style="color:var(--gold-light);">Transcripció automàtica</span>
           <span class="paso-tag" style="color:var(--gold);">Recomanat</span>
         </div>
         <div class="paso-body" style="display:block;">
-          <div class="note" id="auto-warn" style="display:none; border-left-color:#8b1a1a; color:#d47f7f;">
-            Cal configurar el <strong>GitHub Personal Access Token</strong> a ⚙ Config per usar el mode automàtic.
-          </div>
           <p class="note">
-            Introdueix la URL del VOD i deixa que GitHub Actions descarregui l'àudio i el
-            transcrigui amb <strong>AssemblyAI</strong> (Català natiu) —
-            automàticament. Rebràs un correu amb la transcripció en ~15-20 min.
-            Llavors copia-la al <strong>Pas 2 → Enganxar transcripció</strong> i genera el recap amb Claude.ai.
+            Ves a GitHub Actions, introdueix la URL del VOD i deixa que AssemblyAI ho
+            transcrigui tot sol (~15-20 min). Rebràs un correu quan estigui llest.
+            La transcripció apareixerà a la pestanya <strong>📄 Transcripcions</strong>
+            on podràs copiar-la i continuar des d'aquí.
           </p>
-
-          <div class="fg">
-            <label class="fl" for="auto-url">URL del VOD de Twitch</label>
-            <input class="fi" id="auto-url" type="url"
-              placeholder="https://www.twitch.tv/videos/1234567890" />
-          </div>
-
-          <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
-            <div class="fg" style="flex:1; min-width:200px;">
-              <label class="fl" for="auto-titulo">Títol (opcional)</label>
-              <input class="fi" id="auto-titulo" type="text"
-                placeholder="Sessió 7: El Bosc Maleït" />
-            </div>
-            <div class="fg" style="flex:0 0 140px;">
-              <label class="fl" for="auto-idioma">Idioma</label>
-              <select class="fs" id="auto-idioma">
-                <option value="ca" selected>Català</option>
-                <option value="es">Español</option>
-                <option value="en">English</option>
-                <option value="fr">Français</option>
-                <option value="de">Deutsch</option>
-                <option value="pt">Português</option>
-              </select>
-            </div>
-          </div>
-
           <div class="btn-row">
-            <button class="btn btn-red" id="btn-auto" onclick="triggerWorkflow()">
-              ★ Generar crònica automàticament
-            </button>
+            <a class="btn btn-red" id="btn-actions-link" href="#" target="_blank" rel="noopener">
+              ★ Anar a GitHub Actions →
+            </a>
           </div>
-          <div class="msg" id="msg-auto"></div>
         </div>
       </div>
 
       <p style="font-family:'Cinzel',serif; font-size:0.72rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-dim); margin:0.5rem 0 1.25rem; display:flex; align-items:center; gap:1rem;">
         <span style="flex:1; height:1px; background:linear-gradient(to right, transparent, var(--border));"></span>
-        o fes-ho manualment
+        o carrega l'àudio manualment
         <span style="flex:1; height:1px; background:linear-gradient(to left, transparent, var(--border));"></span>
       </p>
 
@@ -779,28 +762,9 @@
       <h2 class="view-title">⚙ Configuración</h2>
 
       <div class="cfg-sec">
-        <p class="cfg-sec-title">GitHub Personal Access Token</p>
+        <p class="cfg-sec-title">API Key de Groq (transcripció manual al navegador)</p>
         <p style="font-size:0.92rem; margin-bottom:0.9rem;">
-          Necessari per disparar el <strong>Mode Automàtic</strong> des del navegador.
-          Crea'n un a
-          <a href="https://github.com/settings/tokens/new?scopes=workflow&description=TragonaEscupidora" target="_blank" style="color:var(--gold);">github.com/settings/tokens</a>
-          amb el permís <code>workflow</code>.
-        </p>
-        <div class="fg">
-          <label class="fl" for="in-pat">GitHub PAT</label>
-          <div style="display:flex; gap:0.5rem;">
-            <input class="fi" id="in-pat" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="flex:1;" />
-            <button class="btn btn-gold" onclick="savePat()">Guardar</button>
-          </div>
-          <p class="fn">Es desa només en aquest navegador (localStorage). Només s'envia a GitHub per disparar el workflow.</p>
-        </div>
-        <div class="msg" id="msg-pat"></div>
-      </div>
-
-      <div class="cfg-sec">
-        <p class="cfg-sec-title">API Key de Groq (opcional, transcripció manual)</p>
-        <p style="font-size:0.92rem; margin-bottom:0.9rem;">
-          Només necessària si vols usar el flux manual (carregar fitxer al navegador).
+          Necessària si prefereixes carregar el fitxer d'àudio directament al navegador.
           Crea-la gratis a
           <a href="https://console.groq.com" target="_blank" style="color:var(--gold);">console.groq.com</a>.
         </p>
@@ -816,46 +780,42 @@
       </div>
 
       <div class="cfg-sec">
-        <p class="cfg-sec-title">Configuració de GitHub Actions (mode automàtic)</p>
+        <p class="cfg-sec-title">Configuració inicial (una sola vegada)</p>
         <p style="font-size:0.9rem; margin-bottom:1rem; color:var(--text-dim);">
-          Fes-ho una sola vegada. Després, cada sessió és 1 clic.
+          Després de configurar-ho, cada sessió és 3 clics des de qualsevol ordinador.
         </p>
 
         <div class="inst-step">
           <span class="inst-n">1</span>
           <div class="inst-body">
-            <strong style="color:var(--text-bright);">Crea el repositori a GitHub</strong>
-            i activa GitHub Pages des de <code>Settings → Pages → Source: /docs</code>.
+            <strong style="color:var(--text-bright);">Activa GitHub Pages</strong> —
+            <code>Settings → Pages → Source: /docs</code>
           </div>
         </div>
 
         <div class="inst-step">
           <span class="inst-n">2</span>
           <div class="inst-body">
-            <strong style="color:var(--text-bright);">Afegeix els secrets</strong> a
+            <strong style="color:var(--text-bright);">Afegeix el secret</strong> a
             <code>Settings → Secrets → Actions</code>:
-            <ul style="margin-top:0.4rem; padding-left:1.2rem; font-size:0.85rem; color:var(--text-dim);">
-              <li><code>ASSEMBLYAI_API_KEY</code> — clau de
-                <a href="https://www.assemblyai.com/dashboard/api-keys" target="_blank" style="color:var(--gold);">AssemblyAI</a>
-                (~$0.15/h, Universal-2, suport Català natiu)</li>
-            </ul>
+            <code>ASSEMBLYAI_API_KEY</code> —
+            clau de <a href="https://www.assemblyai.com/dashboard/api-keys" target="_blank" style="color:var(--gold);">assemblyai.com</a>
           </div>
         </div>
 
         <div class="inst-step">
           <span class="inst-n">3</span>
           <div class="inst-body">
-            <strong style="color:var(--text-bright);">Configura el GitHub PAT</strong> (camp de dalt)
-            per disparar el workflow des d'aquest navegador.
+            <strong style="color:var(--text-bright);">Crea la label "recap"</strong> a Issues → Labels
+            (per a les notificacions de workflow completat).
           </div>
         </div>
 
         <div class="inst-step">
           <span class="inst-n">4</span>
           <div class="inst-body">
-            <strong style="color:var(--text-bright);">Activa les notificacions</strong> a
-            <code>github.com/[repo] → Watch → All Activity</code> per rebre
-            un correu electrònic quan el recap estigui llest.
+            <strong style="color:var(--text-bright);">Activa notificacions</strong> —
+            al repositori, <code>Watch → All Activity</code> per rebre email quan la transcripció estigui llesta.
           </div>
         </div>
       </div>
@@ -968,25 +928,32 @@ TRANSCRIPCIÓN:
 
   // ── Boot ─────────────────────────────────────────────────────────────
   async function boot() {
+    let cfg = {};
     try {
-      const cfg = await fetch("config.json?" + Date.now()).then(r => r.json());
+      cfg = await fetch("config.json?" + Date.now()).then(r => r.json());
       document.getElementById("el-titulo").textContent = cfg.titulo_campana || "D&D Recaps";
       document.getElementById("el-sub").textContent    = cfg.descripcion    || "";
       document.title = (cfg.titulo_campana || "D&D Recaps") + " — Recaps";
     } catch (_) {}
+
+    // Wire the GitHub Actions link using config values (works from any computer)
+    const owner      = cfg.github_owner      || "";
+    const repo       = cfg.github_repo       || "";
+    const workflowId = cfg.workflow_id        || "generate-recap.yml";
+    if (owner && repo) {
+      document.getElementById("btn-actions-link").href =
+        `https://github.com/${owner}/${repo}/actions/workflows/${workflowId}`;
+    }
 
     try {
       githubRecaps = await fetch("recaps.json?" + Date.now()).then(r => r.json());
     } catch (_) { githubRecaps = []; }
 
     renderGrid();
+    renderTranscripts();
 
     const gk = localStorage.getItem("dnd_groq_key") || "";
     if (gk) document.getElementById("in-groq").value = gk;
-
-    const pat = localStorage.getItem("dnd_github_pat") || "";
-    if (pat) document.getElementById("in-pat").value = pat;
-    if (!pat) document.getElementById("auto-warn").style.display = "block";
 
     // Show resume banner if there's a saved partial transcription
     const partial = loadPartial();
@@ -1016,7 +983,63 @@ TRANSCRIPCIÓN:
     document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("on"));
     document.getElementById("vista-" + id).classList.add("on");
     document.getElementById("tab-" + id).classList.add("on");
-    if (id === "recaps") renderGrid();
+    if (id === "recaps")      renderGrid();
+    if (id === "transcripts") renderTranscripts();
+  }
+
+  // ── Transcripts grid ─────────────────────────────────────────────────
+  let githubTranscripts = [];
+
+  async function renderTranscripts() {
+    const grid = document.getElementById("grid-transcripts");
+    try {
+      githubTranscripts = await fetch("transcripts.json?" + Date.now()).then(r => r.json());
+    } catch (_) { githubTranscripts = []; }
+
+    if (!githubTranscripts.length) {
+      grid.innerHTML = `<div class="empty"><div class="empty-icon">📄</div>
+        <p>Encara no hi ha transcripcions. Usa ✦ Nova Sessió → GitHub Actions per generar-ne una.</p></div>`;
+      return;
+    }
+
+    grid.innerHTML = githubTranscripts.map((t, i) => `
+      <article class="card">
+        <p class="card-date">${fmtDate(t.data)}</p>
+        <h2 class="card-title">${esc(t.titol)}</h2>
+        <p class="card-summary" style="font-size:0.82rem;">${t.paraules ? t.paraules.toLocaleString() + " paraules" : ""}</p>
+        <div class="card-foot" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">
+          <button class="btn btn-red btn-sm" onclick="copyAndPaste(${i})">
+            📋 Copiar i enganxar al wizard
+          </button>
+          ${t.vod_url ? `<a class="btn btn-gold btn-sm" href="${esc(t.vod_url)}" target="_blank" rel="noopener">▶ VOD</a>` : ""}
+        </div>
+      </article>`).join("");
+  }
+
+  async function copyAndPaste(i) {
+    const t = githubTranscripts[i];
+    const btn = document.querySelectorAll("#grid-transcripts .btn-red")[i];
+    btn.textContent = "Carregant…";
+    btn.disabled = true;
+
+    try {
+      const text = await fetch(t.fitxer + "?" + Date.now()).then(r => r.text());
+      // Strip comment header lines (lines starting with #)
+      const bodyLines = text.split("\n").filter(l => !l.startsWith("#")).join("\n").trim();
+
+      // Drop it into the manual-transcript textarea and switch to wizard
+      document.getElementById("manual-transcript").value = bodyLines;
+      document.getElementById("ses-titulo").value = t.titol || "";
+      document.getElementById("manual-transcript").dispatchEvent(new Event("input"));
+      showView("wizard");
+      // Activate step 2 paste tab
+      switchTab("paste");
+      activateStep(2);
+      btn.textContent = "✓ Enganxat";
+    } catch (e) {
+      btn.textContent = "Error — reintenta";
+      btn.disabled = false;
+    }
   }
 
   // ── Grid ─────────────────────────────────────────────────────────────
@@ -1437,81 +1460,11 @@ TRANSCRIPCIÓN:
   }
 
   // ── Config ───────────────────────────────────────────────────────────
-  function savePat() {
-    const k = document.getElementById("in-pat").value.trim();
-    if (!k) { showMsg("msg-pat", "Introdueix un PAT.", "err"); return; }
-    localStorage.setItem("dnd_github_pat", k);
-    showMsg("msg-pat", "✓ PAT desat.", "ok");
-    document.getElementById("auto-warn").style.display = "none";
-  }
-
   function saveGroqKey() {
     const k = document.getElementById("in-groq").value.trim();
     if (!k) { showMsg("msg-groq", "Introdueix una API key.", "err"); return; }
     localStorage.setItem("dnd_groq_key", k);
     showMsg("msg-groq", "✓ API key desada.", "ok");
-  }
-
-  // ── Mode Automàtic ────────────────────────────────────────────────────
-  async function triggerWorkflow() {
-    const url = document.getElementById("auto-url").value.trim();
-    if (!url) { showMsg("msg-auto", "Introdueix la URL del VOD.", "err"); return; }
-
-    const pat = localStorage.getItem("dnd_github_pat");
-    if (!pat) { showMsg("msg-auto", "Cal configurar el GitHub PAT a ⚙ Config.", "err"); return; }
-
-    let cfg = {};
-    try { cfg = await fetch("config.json?" + Date.now()).then(r => r.json()); } catch (_) {}
-
-    const owner      = cfg.github_owner;
-    const repo       = cfg.github_repo;
-    const workflowId = cfg.workflow_id || "generate-recap.yml";
-
-    if (!owner || !repo) {
-      showMsg("msg-auto", "Falta github_owner/github_repo a config.json.", "err");
-      return;
-    }
-
-    const titulo = document.getElementById("auto-titulo").value.trim();
-    const idioma = document.getElementById("auto-idioma").value;
-
-    const btn = document.getElementById("btn-auto");
-    btn.disabled = true;
-    showMsg("msg-auto", "Enviant…", "info");
-
-    try {
-      const resp = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${pat}`,
-            "Accept": "application/vnd.github.v3+json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ref: "master",
-            inputs: { vod_url: url, titulo, idioma },
-          }),
-        }
-      );
-
-      if (resp.status === 204) {
-        const actionsUrl = `https://github.com/${owner}/${repo}/actions/workflows/${workflowId}`;
-        showMsg("msg-auto", "✓ Workflow engegat! El recap apareixerà al lloc en ~20-30 min. Rebràs una notificació de GitHub quan estigui llest.", "ok");
-        document.getElementById("msg-auto").innerHTML +=
-          ` <a href="${esc(actionsUrl)}" target="_blank" rel="noopener" style="color:var(--green-text);">Seguir el progrés →</a>`;
-        document.getElementById("auto-url").value = "";
-        document.getElementById("auto-titulo").value = "";
-      } else {
-        const errText = await resp.text().catch(() => `HTTP ${resp.status}`);
-        showMsg("msg-auto", `Error ${resp.status}: ${errText}`, "err");
-        btn.disabled = false;
-      }
-    } catch (e) {
-      showMsg("msg-auto", `Error de xarxa: ${e.message}`, "err");
-      btn.disabled = false;
-    }
   }
 
   // ── Step helpers ─────────────────────────────────────────────────────

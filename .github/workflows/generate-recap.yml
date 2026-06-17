@@ -72,7 +72,7 @@ jobs:
           git config user.name  "Cronista de la Masmorra"
           git config user.email "actions@github.com"
 
-          git add docs/transcripts/
+          git add docs/transcripts/ docs/transcripts.json
 
           if git diff --staged --quiet; then
             echo "Cap canvi per commitear."

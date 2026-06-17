@@ -150,13 +150,29 @@ def main() -> None:
         f.write(transcripcio)
 
     paraules = len(transcripcio.split())
-    print(f"\n✓ Transcripció desada a: {ruta_fitxer}")
-    print(f"  {paraules:,} paraules")
-    print(f"\nSeguent pas: ves al wizard → Nova Sessió → Pas 2 → 'Enganxar transcripció'")
 
-    # Escriure el path per al workflow de GitHub Actions
-    print(f"::set-output name=transcript_file::{ruta_fitxer}")
-    print(f"::set-output name=transcript_slug::{fecha}-{slug}")
+    # Actualitzar l'índex de transcripcions (com recaps.json)
+    ruta_index = dir_salida.parent / "transcripts.json"
+    entrades = []
+    if ruta_index.exists() and ruta_index.stat().st_size > 2:
+        import json
+        with open(ruta_index, "r", encoding="utf-8") as f:
+            entrades = json.load(f)
+
+    import json
+    entrades.insert(0, {
+        "id":      f"{fecha}-{slug}",
+        "titol":   titol or f"Sessió del {fecha}",
+        "data":    fecha,
+        "fitxer":  f"transcripts/{nom_fitxer}",
+        "vod_url": args.url,
+        "paraules": paraules,
+    })
+    with open(ruta_index, "w", encoding="utf-8") as f:
+        json.dump(entrades, f, ensure_ascii=False, indent=2)
+
+    print(f"\n✓ Transcripció desada a: {ruta_fitxer}  ({paraules:,} paraules)")
+    print(f"✓ transcripts.json actualitzat ({len(entrades)} entrades)")
 
 
 if __name__ == "__main__":
