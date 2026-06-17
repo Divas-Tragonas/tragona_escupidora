@@ -47,6 +47,8 @@ def descargar_audio(url_vod: str, directorio_temp: Path, fitxer_cookies: str | N
         "outtmpl": str(directorio_temp / "audio.%(ext)s"),
         "quiet": False,
         "no_warnings": False,
+        # Android client no necessita JS challenge solving (per entorns headless com CI)
+        "extractor_args": {"youtube": {"player_client": ["android"]}},
     }
 
     if fitxer_cookies:
