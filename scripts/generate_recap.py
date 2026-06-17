@@ -1,29 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Generador automático de recaps para sesiones de D&D desde VODs de Twitch.
+Generador automàtic de recaps per a sessions de D&D des de VODs de Twitch.
 
-Flujo:
-  1. Descarga el audio del VOD con yt-dlp (convertido a mp3 128kbps)
-  2. Trocea el audio en segmentos de 10 minutos con ffmpeg
-  3. Transcribe cada segmento con Groq Whisper large-v3
-  4. Genera el recap estructurado con Claude claude-opus-4-7
-  5. Guarda el Markdown en /docs/recaps/ y actualiza /docs/recaps.json
+Flux:
+  1. Descarrega l'àudio del VOD amb yt-dlp (convertit a mp3 128kbps)
+  2. Transcriu el fitxer sencer amb AssemblyAI Universal-2 (suport Català natiu)
+  3. Genera el recap estructurat amb Claude
+  4. Desa el Markdown a /docs/recaps/ i actualitza /docs/recaps.json
 
-Uso:
-  python generate_recap.py --url <URL_VOD> [--titulo "Nombre sesión"] [--idioma es]
+Ús:
+  python generate_recap.py --url <URL_VOD> [--titulo "Nom sessió"] [--idioma ca]
 
-Variables de entorno requeridas:
+Variables d'entorn requerides:
   ANTHROPIC_API_KEY
-  GROQ_API_KEY
+  ASSEMBLYAI_API_KEY
 """
 
 import os
 import sys
 import json
-import time
 import argparse
-import subprocess
 import re
 import tempfile
 from pathlib import Path
@@ -31,18 +28,18 @@ from datetime import datetime
 
 import yt_dlp
 import anthropic
-from groq import Groq
+import assemblyai as aai
 
 
 # ──────────────────────────────────────────────
-# DESCARGA DE AUDIO
+# DESCÀRREGA D'ÀUDIO
 # ──────────────────────────────────────────────
 
 def descargar_audio(url_vod: str, directorio_temp: Path) -> Path:
     """
-    Descarga el audio del VOD de Twitch usando yt-dlp.
-    Convierte automáticamente a mp3 128kbps para mantener los segmentos
-    por debajo del límite de 25MB de la API de Groq.
+    Descarrega l'àudio del VOD de Twitch usant yt-dlp.
+    Converteix a mp3 128kbps. Rev.ai accepta fitxers grans (fins a 5 GB),
+    de manera que no cal fragmentar l'àudio.
     """
     ruta_salida = directorio_temp / "audio.mp3"
 
@@ -53,238 +50,184 @@ def descargar_audio(url_vod: str, directorio_temp: Path) -> Path:
             "preferredcodec": "mp3",
             "preferredquality": "128",
         }],
-        # Plantilla de salida sin extensión; yt-dlp la añade tras la conversión
         "outtmpl": str(directorio_temp / "audio.%(ext)s"),
         "quiet": False,
         "no_warnings": False,
     }
 
-    print(f"[1/4] Descargando audio de: {url_vod}")
+    print(f"[1/3] Descarregant àudio de: {url_vod}")
     with yt_dlp.YoutubeDL(opciones_ydl) as ydl:
         ydl.download([url_vod])
 
     if not ruta_salida.exists():
         raise FileNotFoundError(
-            "yt-dlp no generó audio.mp3. "
-            "Si el VOD es de suscriptores o está caducado, no se puede descargar."
+            "yt-dlp no ha generat audio.mp3. "
+            "Si el VOD és de subscriptors o ha caducat, no es pot descarregar."
         )
 
     tamanio_mb = ruta_salida.stat().st_size / 1024 / 1024
-    print(f"    Audio descargado: {tamanio_mb:.1f} MB")
+    print(f"    Àudio descarregat: {tamanio_mb:.1f} MB")
     return ruta_salida
 
 
 # ──────────────────────────────────────────────
-# TROCEADO CON FFMPEG
+# TRANSCRIPCIÓ AMB ASSEMBLYAI
 # ──────────────────────────────────────────────
 
-def trocear_audio(ruta_audio: Path, directorio_temp: Path, duracion_seg: int = 600) -> list[Path]:
+def transcribir_con_assemblyai(ruta_audio: Path, idioma: str = "ca") -> str:
     """
-    Divide el audio en segmentos de longitud fija usando ffmpeg.
-    Con -c copy no re-encoda, solo busca puntos de corte en el stream mp3,
-    lo que es muy rápido y sin pérdida de calidad adicional.
+    Transcriu el fitxer d'àudio sencer amb AssemblyAI Universal-2.
+
+    Universal-2 suporta Català (ca) en la categoria d'alta precisió (≤10% WER).
+    Universal-3 Pro no suporta Català — no usar-lo com a fallback per a ca.
+    El SDK gestiona l'upload, el polling i els errors automàticament.
+    Cost aproximat: $0.15/h (~$0.90/mes per 6h).
     """
-    patron_salida = str(directorio_temp / "segmento_%03d.mp3")
+    aai.settings.api_key = os.environ["ASSEMBLYAI_API_KEY"]
 
-    cmd = [
-        "ffmpeg",
-        "-i", str(ruta_audio),
-        "-f", "segment",
-        "-segment_time", str(duracion_seg),
-        "-c", "copy",
-        "-reset_timestamps", "1",
-        patron_salida,
-        "-y",           # sobreescribir sin preguntar
-        "-loglevel", "warning",
-    ]
+    mida_mb = ruta_audio.stat().st_size / 1024 / 1024
+    print(f"[2/3] Enviant {mida_mb:.1f} MB a AssemblyAI (Universal-2, idioma: {idioma})…")
+    print(f"    Sessió de 3h tarda ~10-15 min. El SDK gestiona l'espera.")
 
-    print(f"[2/4] Troceando audio en segmentos de {duracion_seg // 60} minutos...")
-    resultado = subprocess.run(cmd, capture_output=True, text=True)
-    if resultado.returncode != 0:
-        raise RuntimeError(f"ffmpeg falló:\n{resultado.stderr}")
+    config = aai.TranscriptionConfig(
+        speech_models=["universal-2"],
+        language_code=idioma,
+    )
 
-    segmentos = sorted(directorio_temp.glob("segmento_*.mp3"))
-    if not segmentos:
-        raise RuntimeError("ffmpeg no generó ningún segmento.")
+    transcript = aai.Transcriber(config=config).transcribe(str(ruta_audio))
 
-    print(f"    {len(segmentos)} segmentos generados.")
-    return segmentos
+    if transcript.status == aai.TranscriptStatus.error:
+        raise RuntimeError(f"AssemblyAI error: {transcript.error}")
+
+    paraules = len(transcript.text.split())
+    print(f"    Transcripció completa: {paraules:,} paraules.")
+    return transcript.text
 
 
 # ──────────────────────────────────────────────
-# TRANSCRIPCIÓN CON GROQ
-# ──────────────────────────────────────────────
-
-def transcribir_segmento(cliente_groq: Groq, ruta_segmento: Path, idioma: str = "es") -> str:
-    """
-    Transcribe un único segmento de audio con Groq Whisper large-v3.
-    Incluye reintentos con espera exponencial para absorber errores transitorios de la API.
-    """
-    max_reintentos = 3
-    for intento in range(max_reintentos):
-        try:
-            with open(ruta_segmento, "rb") as f:
-                transcripcion = cliente_groq.audio.transcriptions.create(
-                    model="whisper-large-v3",
-                    file=f,
-                    language=idioma,
-                    response_format="text",
-                )
-            return transcripcion
-        except Exception as e:
-            if intento < max_reintentos - 1:
-                espera = 2 ** intento * 5   # 5s, 10s, 20s
-                print(f"    Error en segmento {ruta_segmento.name}: {e}. Reintentando en {espera}s...")
-                time.sleep(espera)
-            else:
-                raise RuntimeError(f"No se pudo transcribir {ruta_segmento.name}: {e}") from e
-
-
-def transcribir_todos(cliente_groq: Groq, segmentos: list[Path], idioma: str = "es") -> str:
-    """
-    Transcribe todos los segmentos secuencialmente y concatena el resultado.
-    Cada bloque incluye una marca de segmento para que Claude pueda orientarse en el tiempo.
-    """
-    print(f"[3/4] Transcribiendo {len(segmentos)} segmentos con Groq Whisper...")
-    partes = []
-
-    for i, segmento in enumerate(segmentos, 1):
-        minuto_inicio = (i - 1) * 10
-        print(f"    Segmento {i}/{len(segmentos)} (≈{minuto_inicio:02d}:00)...", end=" ", flush=True)
-        texto = transcribir_segmento(cliente_groq, segmento, idioma)
-        partes.append(f"[Segmento {i} — minuto {minuto_inicio}]\n{texto.strip()}")
-        print("✓")
-
-    transcripcion_completa = "\n\n".join(partes)
-    palabras = len(transcripcion_completa.split())
-    print(f"    Transcripción completa: {palabras:,} palabras.")
-    return transcripcion_completa
-
-
-# ──────────────────────────────────────────────
-# GENERACIÓN DEL RECAP CON ANTHROPIC
+# GENERACIÓ DEL RECAP AMB ANTHROPIC
 # ──────────────────────────────────────────────
 
 PROMPT_RECAP = """\
-Eres el cronista oficial de una campaña de Dungeons & Dragons. Recibes la transcripción \
-completa de una sesión de juego grabada en Twitch.
+Ets el cronista oficial d'una campanya de Dungeons & Dragons. Reps la transcripció \
+completa d'una sessió de joc gravada a Twitch.
 
-Tu tarea es generar un recap estructurado, detallado y entretenido en español, útil tanto \
-para los jugadores que quieren repasar la sesión como para quien se la perdió.
+La sessió és en {idioma_nom}. Genera el recap en {idioma_nom}, útil tant \
+per als jugadors que volen repassar la sessió com per a qui se la va perdre.
 
-IMPORTANTE: genera EXACTAMENTE estas secciones Markdown, en este orden, con estos encabezados:
+IMPORTANT: genera EXACTAMENT aquestes seccions Markdown, en aquest ordre, amb aquests encapçalaments:
 
-## Resumen Ejecutivo
-Párrafo de 3-5 frases. Lo más importante de la sesión de un vistazo.
+## Resum Executiu
+Paràgraf de 3-5 frases. El més important de la sessió d'un cop d'ull.
 
-## ⚔️ Combates
-Lista numerada de cada encuentro: enemigos, resultado, bajas o consecuencias notables.
-Si no hubo combates, escribe "Sin combates esta sesión."
+## ⚔️ Combats
+Llista numerada de cada encontre: enemics, resultat, baixes o conseqüències notables.
+Si no hi ha hagut combats, escriu "Sense combats en aquesta sessió."
 
-## 👥 NPCs Encontrados
-Lista con nombre, una línea de descripción y el papel que jugaron en la sesión.
-Incluye tanto NPCs nuevos como los que reaparecieron.
+## 👥 NPCs Trobats
+Llista amb nom, una línia de descripció i el paper que han jugat en la sessió.
+Inclou tant NPCs nous com els que han reaparegut.
 
-## 💰 Loot y Recompensas
-Todo el botín, objetos mágicos, monedas o recompensas conseguidos.
-Si no hubo loot, escríbelo explícitamente.
+## 💰 Botí i Recompenses
+Tot el botí, objectes màgics, monedes o recompenses aconseguides.
+Si no hi ha hagut botí, escriu-ho explícitament.
 
-## 🎯 Decisiones Clave
-Las decisiones más importantes tomadas por el grupo (no por el DM) y sus consecuencias inmediatas o potenciales.
+## 🎯 Decisions Clau
+Les decisions més importants preses pel grup (no pel DM) i les seves conseqüències immediates o potencials.
 
 ## 🪝 Plot Hooks
-Hilos argumentales que quedaron abiertos, misterios sin resolver o semillas que el DM \
-parece haber plantado para futuras sesiones.
+Fils argumentals que han quedat oberts, misteris sense resoldre o llavors que el DM \
+sembla haver plantat per a futures sessions.
 
-## ✨ Momentos Memorables
-Los 3-5 momentos más épicos, divertidos o emocionantes. Sé específico y descriptivo.
+## ✨ Moments Memorables
+Els 3-5 moments més èpics, divertits o emocionants. Sigues específic i descriptiu.
 
-## 💬 Quotes Destacadas
-Citas textuales memorables de jugadores o el DM. Atribúyelas si el nombre es identificable.
-Formato: > "Cita" — *Nombre*
+## 💬 Cites Destacades
+Cites textuals memorables de jugadors o el DM. Atribueix-les si el nom és identificable.
+Format: > "Cita" — *Nom*
 
 ---
 
-Si algo no se entiende bien en la transcripción, usa [inaudible] o [poco claro].
-No inventes hechos; cíñete a lo que aparece en la transcripción.
+Si alguna cosa no s'entén bé en la transcripció, usa [inaudible] o [poc clar].
+No inventis fets; cenyeix-te al que apareix en la transcripció.
 
-TRANSCRIPCIÓN:
+TRANSCRIPCIÓ:
 
 {transcripcion}
 """
 
+IDIOMES = {
+    "ca": "català",
+    "es": "castellà",
+    "en": "anglès",
+    "fr": "francès",
+    "de": "alemany",
+    "pt": "portuguès",
+    "it": "italià",
+}
 
-def generar_titulo_automatico(cliente_anthropic: anthropic.Anthropic, fragmento: str) -> str:
-    """
-    Pide a Claude que genere un título creativo de máximo 6 palabras
-    basándose en el primer fragmento de la transcripción.
-    """
+
+def generar_titulo_automatico(cliente_anthropic: anthropic.Anthropic, fragmento: str, idioma: str = "ca") -> str:
+    idioma_nom = IDIOMES.get(idioma, idioma)
     respuesta = cliente_anthropic.messages.create(
         model="claude-opus-4-7",
         max_tokens=80,
         messages=[{
             "role": "user",
             "content": (
-                "Basándote en este fragmento de una sesión de D&D, genera un título creativo "
-                "y conciso en español (máximo 6 palabras). Solo devuelve el título, sin comillas "
-                "ni explicaciones adicionales.\n\nFragmento:\n" + fragmento[:3000]
+                f"Basant-te en aquest fragment d'una sessió de D&D, genera un títol creatiu "
+                f"i concís en {idioma_nom} (màxim 6 paraules). Retorna només el títol, sense cometes "
+                f"ni explicacions addicionals.\n\nFragment:\n" + fragmento[:3000]
             ),
         }],
     )
     return respuesta.content[0].text.strip()
 
 
-def generar_recap(cliente_anthropic: anthropic.Anthropic, transcripcion: str, titulo: str) -> str:
-    """
-    Llama a Claude claude-opus-4-7 para generar el recap completo.
-    claude-opus-4-7 tiene una ventana de contexto de 200K tokens, suficiente
-    para sesiones de D&D de hasta ~6 horas.
-    """
-    print("[4/4] Generando recap con Claude claude-opus-4-7...")
+def generar_recap(cliente_anthropic: anthropic.Anthropic, transcripcion: str, titulo: str, idioma: str = "ca") -> str:
+    idioma_nom = IDIOMES.get(idioma, idioma)
+    print("[3/3] Generant recap amb Claude…")
     respuesta = cliente_anthropic.messages.create(
         model="claude-opus-4-7",
         max_tokens=4096,
         messages=[{
             "role": "user",
-            "content": PROMPT_RECAP.format(transcripcion=transcripcion),
+            "content": PROMPT_RECAP.format(
+                transcripcion=transcripcion,
+                idioma_nom=idioma_nom,
+            ),
         }],
     )
     contenido = respuesta.content[0].text
 
     tokens_entrada = respuesta.usage.input_tokens
     tokens_salida = respuesta.usage.output_tokens
-    print(f"    Tokens usados: {tokens_entrada:,} entrada / {tokens_salida:,} salida.")
+    print(f"    Tokens usats: {tokens_entrada:,} entrada / {tokens_salida:,} sortida.")
     return contenido
 
 
 # ──────────────────────────────────────────────
-# UTILIDADES
+# UTILITATS
 # ──────────────────────────────────────────────
 
 def slugify(texto: str) -> str:
-    """Convierte un texto libre a formato kebab-case seguro para nombres de archivo."""
     texto = texto.lower()
-    # Reemplazar vocales con tilde
     for con_tilde, sin_tilde in [("áàäâ", "a"), ("éèëê", "e"), ("íìïî", "i"), ("óòöô", "o"), ("úùüû", "u")]:
         for c in con_tilde:
             texto = texto.replace(c, sin_tilde)
-    texto = texto.replace("ñ", "n")
+    texto = texto.replace("ñ", "n").replace("ç", "c").replace("·", "l")
     texto = re.sub(r"[^a-z0-9]+", "-", texto)
     texto = texto.strip("-")
-    return texto[:60]   # límite razonable de longitud
+    return texto[:60]
 
 
 def extraer_resumen_ejecutivo(contenido_recap: str) -> str:
-    """
-    Extrae el texto bajo '## Resumen Ejecutivo' para usarlo como
-    descripción corta en recaps.json.
-    """
     lineas = contenido_recap.split("\n")
     capturando = False
     fragmentos = []
 
     for linea in lineas:
-        if "Resumen Ejecutivo" in linea:
+        if "Resum Executiu" in linea or "Resumen Ejecutivo" in linea:
             capturando = True
             continue
         if capturando:
@@ -298,10 +241,6 @@ def extraer_resumen_ejecutivo(contenido_recap: str) -> str:
 
 
 def actualizar_indice(ruta_indice: Path, nueva_entrada: dict) -> None:
-    """
-    Inserta la nueva entrada al principio de recaps.json (más reciente primero).
-    Crea el archivo si no existe.
-    """
     recaps = []
     if ruta_indice.exists() and ruta_indice.stat().st_size > 2:
         with open(ruta_indice, "r", encoding="utf-8") as f:
@@ -312,86 +251,72 @@ def actualizar_indice(ruta_indice: Path, nueva_entrada: dict) -> None:
     with open(ruta_indice, "w", encoding="utf-8") as f:
         json.dump(recaps, f, ensure_ascii=False, indent=2)
 
-    print(f"    recaps.json actualizado ({len(recaps)} entradas).")
+    print(f"    recaps.json actualitzat ({len(recaps)} entrades).")
 
 
 # ──────────────────────────────────────────────
-# PUNTO DE ENTRADA
+# PUNT D'ENTRADA
 # ──────────────────────────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Genera recaps de sesiones de D&D desde VODs de Twitch."
+        description="Genera recaps de sessions de D&D des de VODs de Twitch."
     )
     parser.add_argument("--url", required=True, help="URL del VOD de Twitch")
-    parser.add_argument("--titulo", default="", help="Título de la sesión (se genera automáticamente si se omite)")
-    parser.add_argument("--idioma", default="es", help="Código de idioma del audio para Whisper (default: es)")
-    parser.add_argument("--salida", default="docs/recaps", help="Directorio donde guardar el Markdown generado")
-    parser.add_argument("--duracion-seg", type=int, default=600, help="Duración de cada segmento en segundos (default: 600)")
+    parser.add_argument("--titulo", default="", help="Títol de la sessió (es genera automàticament si s'omet)")
+    parser.add_argument("--idioma", default="ca", help="Codi d'idioma per a Rev.ai (default: ca = català)")
+    parser.add_argument("--salida", default="docs/recaps", help="Directori on desar el Markdown generat")
     args = parser.parse_args()
 
-    # Verificar que las API keys estén presentes
-    for variable in ("ANTHROPIC_API_KEY", "GROQ_API_KEY"):
+    for variable in ("ANTHROPIC_API_KEY", "ASSEMBLYAI_API_KEY"):
         if not os.environ.get(variable):
-            print(f"Error: la variable de entorno {variable} no está configurada.", file=sys.stderr)
+            print(f"Error: la variable d'entorn {variable} no està configurada.", file=sys.stderr)
             sys.exit(1)
 
-    cliente_groq = Groq(api_key=os.environ["GROQ_API_KEY"])
     cliente_anthropic = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
     dir_salida = Path(args.salida)
     dir_salida.mkdir(parents=True, exist_ok=True)
 
-    # Usar directorio temporal para audio; se borra automáticamente al terminar
     with tempfile.TemporaryDirectory(prefix="dnd_recap_") as tmp:
         tmp_path = Path(tmp)
 
-        # Paso 1: Descargar audio
         ruta_audio = descargar_audio(args.url, tmp_path)
+        transcripcion = transcribir_con_assemblyai(ruta_audio, args.idioma)
 
-        # Paso 2: Trocear
-        segmentos = trocear_audio(ruta_audio, tmp_path, args.duracion_seg)
-
-        # Paso 3: Transcribir
-        transcripcion = transcribir_todos(cliente_groq, segmentos, args.idioma)
-
-        # Paso 4a: Generar título si no se proporcionó
         titulo = args.titulo.strip()
         if not titulo:
-            print("    Generando título automático con Claude...")
-            titulo = generar_titulo_automatico(cliente_anthropic, transcripcion)
-        print(f"    Título: {titulo}")
+            print("    Generant títol automàtic amb Claude…")
+            titulo = generar_titulo_automatico(cliente_anthropic, transcripcion, args.idioma)
+        print(f"    Títol: {titulo}")
 
-        # Paso 4b: Generar recap
-        recap_cuerpo = generar_recap(cliente_anthropic, transcripcion, titulo)
+        recap_cuerpo = generar_recap(cliente_anthropic, transcripcion, titulo, args.idioma)
 
-    # Construir el archivo Markdown final
     fecha = datetime.now().strftime("%Y-%m-%d")
     slug = slugify(titulo)
     nombre_archivo = f"{fecha}-{slug}.md"
 
     encabezado_frontmatter = f"""\
 ---
-titulo: "{titulo}"
-fecha: "{fecha}"
+titol: "{titulo}"
+data: "{fecha}"
 vod_url: "{args.url}"
+idioma: "{args.idioma}"
 ---
 
 # {titulo}
 
-*Sesión del {fecha} · [Ver VOD]({args.url})*
+*Sessió del {fecha} · [Veure VOD]({args.url})*
 
 """
 
     contenido_final = encabezado_frontmatter + recap_cuerpo
 
-    # Guardar el Markdown
     ruta_archivo = dir_salida / nombre_archivo
     with open(ruta_archivo, "w", encoding="utf-8") as f:
         f.write(contenido_final)
-    print(f"\n✓ Recap guardado en: {ruta_archivo}")
+    print(f"\n✓ Recap desat a: {ruta_archivo}")
 
-    # Actualizar el índice JSON
     resumen_corto = extraer_resumen_ejecutivo(recap_cuerpo)
     entrada_indice = {
         "id": f"{fecha}-{slug}",
@@ -405,7 +330,7 @@ vod_url: "{args.url}"
     ruta_indice = dir_salida.parent / "recaps.json"
     actualizar_indice(ruta_indice, entrada_indice)
 
-    print(f"✓ Proceso completado. Recap disponible en GitHub Pages en unos segundos.")
+    print(f"✓ Procés completat. Recap disponible a GitHub Pages en uns segons.")
 
 
 if __name__ == "__main__":

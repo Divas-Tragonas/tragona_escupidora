@@ -1,6 +1,6 @@
 name: 📜 Generar Recap D&D
 
-# Se dispara manualmente desde la web (vía API) o desde la pestaña Actions de GitHub
+# Es dispara manualment des de la web (via API) o des de la pestanya Actions de GitHub
 on:
   workflow_dispatch:
     inputs:
@@ -9,16 +9,17 @@ on:
         required: true
         type: string
       titulo:
-        description: "Título de la sesión (opcional — se genera automáticamente si se deja vacío)"
+        description: "Títol de la sessió (opcional — es genera automàticament si es deixa buit)"
         required: false
         default: ""
         type: string
       idioma:
-        description: "Idioma del audio para Whisper"
+        description: "Idioma de l'àudio per a Rev.ai"
         required: false
-        default: "es"
+        default: "ca"
         type: choice
         options:
+          - ca
           - es
           - en
           - fr
@@ -28,20 +29,18 @@ on:
 
 jobs:
   generar-recap:
-    name: Generar recap desde VOD
+    name: Generar recap des de VOD
     runs-on: ubuntu-latest
 
-    # Permiso de escritura para que el job pueda hacer push al repositorio
     permissions:
       contents: write
+      issues: write
 
     steps:
-      # ── 1. Clonar el repositorio ──────────────────────────────────────
-      - name: Clonar repositorio
+      # ── 1. Clonar el repositori ───────────────────────────────────────
+      - name: Clonar repositori
         uses: actions/checkout@v4
         with:
-          # Usar el token del repositorio para el checkout; el push posterior
-          # también usa GITHUB_TOKEN gracias al permiso contents: write
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # ── 2. Configurar Python ─────────────────────────────────────────
@@ -52,22 +51,22 @@ jobs:
           cache: "pip"
           cache-dependency-path: scripts/requirements.txt
 
-      # ── 3. Instalar ffmpeg ───────────────────────────────────────────
+      # ── 3. Instalar ffmpeg (necessari per yt-dlp) ─────────────────────
       - name: Instalar ffmpeg
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg
           ffmpeg -version | head -1
 
-      # ── 4. Instalar dependencias Python ──────────────────────────────
-      - name: Instalar dependencias Python
+      # ── 4. Instalar dependències Python ───────────────────────────────
+      - name: Instalar dependències Python
         run: pip install -r scripts/requirements.txt
 
-      # ── 5. Ejecutar el generador de recap ────────────────────────────
+      # ── 5. Executar el generador de recap ─────────────────────────────
       - name: Generar recap
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ASSEMBLYAI_API_KEY: ${{ secrets.ASSEMBLYAI_API_KEY }}
         run: |
           python scripts/generate_recap.py \
             --url "${{ github.event.inputs.vod_url }}" \
@@ -75,21 +74,43 @@ jobs:
             --idioma "${{ github.event.inputs.idioma }}" \
             --salida docs/recaps
 
-      # ── 6. Commit y push ─────────────────────────────────────────────
-      - name: Publicar recap en GitHub Pages
+      # ── 6. Commit i push ──────────────────────────────────────────────
+      - name: Publicar recap a GitHub Pages
         run: |
-          git config user.name  "Cronista de la Mazmorra"
+          git config user.name  "Cronista de la Masmorra"
           git config user.email "actions@github.com"
 
-          # Añadir solo los ficheros que nos interesan (evitar subir temporales)
           git add docs/recaps/ docs/recaps.json
 
-          # Comprobar si hay cambios antes de intentar el commit
           if git diff --staged --quiet; then
-            echo "No hay cambios que commitear. El recap puede que ya existiera."
+            echo "No hi ha canvis. El recap potser ja existia."
             exit 0
           fi
 
           FECHA=$(date +"%Y-%m-%d")
-          git commit -m "📜 Nuevo recap: ${FECHA}"
+          git commit -m "📜 Nou recap: ${FECHA}"
           git push origin master
+
+      # ── 7. Notificació quan el recap és llest ─────────────────────────
+      - name: Notificar recap llest
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="${{ github.repository }}"
+          FECHA=$(date +"%Y-%m-%d")
+          TITOL="${{ github.event.inputs.titulo }}"
+          if [ -z "$TITOL" ]; then TITOL="Sessió del ${FECHA}"; fi
+
+          gh issue create \
+            --repo "$REPO" \
+            --title "✅ Recap llest: ${TITOL}" \
+            --body "El recap de la sessió **${TITOL}** s'ha generat i publicat.
+
+          📖 **Ves al lloc:** https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+
+          🎥 **VOD:** ${{ github.event.inputs.vod_url }}
+
+          ---
+          *Generat automàticament per GitHub Actions el ${FECHA}*" \
+            --label "recap" 2>/dev/null || true

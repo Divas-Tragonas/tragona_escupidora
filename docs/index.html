@@ -485,7 +485,64 @@
   <!-- ══════════════════════ VISTA: WIZARD ══════════════════════ -->
   <div class="vista" id="vista-wizard">
     <div class="wrap wizard-wrap">
-      <h2 class="view-title">✦ Nueva Sesión</h2>
+      <h2 class="view-title">✦ Nova Sessió</h2>
+
+      <!-- ── Mode Automàtic ── -->
+      <div class="paso on" id="auto-mode-box" style="border-color:var(--border-glow); margin-bottom:1.5rem;">
+        <div class="paso-head" style="cursor:default; background:rgba(212,160,23,0.04);">
+          <span class="paso-num" style="border-color:var(--gold); color:var(--gold-light); background:rgba(212,160,23,0.14);">★</span>
+          <span class="paso-label" style="color:var(--gold-light);">Mode Automàtic — URL → Recap</span>
+          <span class="paso-tag" style="color:var(--gold);">Recomanat</span>
+        </div>
+        <div class="paso-body" style="display:block;">
+          <div class="note" id="auto-warn" style="display:none; border-left-color:#8b1a1a; color:#d47f7f;">
+            Cal configurar el <strong>GitHub Personal Access Token</strong> a ⚙ Config per usar el mode automàtic.
+          </div>
+          <p class="note">
+            Introdueix la URL del VOD i deixa que GitHub Actions descarregui l'àudio, el
+            transcrigui amb <strong>AssemblyAI</strong> (Català natiu) i generi el recap —
+            tot automàticament. Rebràs una notificació per correu quan estigui llest (~20-30 min).
+          </p>
+
+          <div class="fg">
+            <label class="fl" for="auto-url">URL del VOD de Twitch</label>
+            <input class="fi" id="auto-url" type="url"
+              placeholder="https://www.twitch.tv/videos/1234567890" />
+          </div>
+
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+            <div class="fg" style="flex:1; min-width:200px;">
+              <label class="fl" for="auto-titulo">Títol (opcional)</label>
+              <input class="fi" id="auto-titulo" type="text"
+                placeholder="Sessió 7: El Bosc Maleït" />
+            </div>
+            <div class="fg" style="flex:0 0 140px;">
+              <label class="fl" for="auto-idioma">Idioma</label>
+              <select class="fs" id="auto-idioma">
+                <option value="ca" selected>Català</option>
+                <option value="es">Español</option>
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="pt">Português</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-red" id="btn-auto" onclick="triggerWorkflow()">
+              ★ Generar crònica automàticament
+            </button>
+          </div>
+          <div class="msg" id="msg-auto"></div>
+        </div>
+      </div>
+
+      <p style="font-family:'Cinzel',serif; font-size:0.72rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-dim); margin:0.5rem 0 1.25rem; display:flex; align-items:center; gap:1rem;">
+        <span style="flex:1; height:1px; background:linear-gradient(to right, transparent, var(--border));"></span>
+        o fes-ho manualment
+        <span style="flex:1; height:1px; background:linear-gradient(to left, transparent, var(--border));"></span>
+      </p>
 
       <!-- Paso 1 -->
       <div class="paso on" id="p1">
@@ -514,9 +571,10 @@
           </div>
 
           <div class="fg">
-            <label class="fl" for="ses-idioma">Idioma del audio</label>
+            <label class="fl" for="ses-idioma">Idioma de l'àudio</label>
             <select class="fs" id="ses-idioma">
-              <option value="es" selected>Español</option>
+              <option value="ca" selected>Català</option>
+              <option value="es">Español</option>
               <option value="en">English</option>
               <option value="fr">Français</option>
               <option value="de">Deutsch</option>
@@ -720,11 +778,30 @@
       <h2 class="view-title">⚙ Configuración</h2>
 
       <div class="cfg-sec">
-        <p class="cfg-sec-title">API Key de Groq (gratuita)</p>
+        <p class="cfg-sec-title">GitHub Personal Access Token</p>
         <p style="font-size:0.92rem; margin-bottom:0.9rem;">
-          La necesitas para transcribir el audio desde el navegador. Crea una en
-          <a href="https://console.groq.com" target="_blank" style="color:var(--gold);">console.groq.com</a>
-          — es gratuita y tarda 1 minuto.
+          Necessari per disparar el <strong>Mode Automàtic</strong> des del navegador.
+          Crea'n un a
+          <a href="https://github.com/settings/tokens/new?scopes=workflow&description=TragonaEscupidora" target="_blank" style="color:var(--gold);">github.com/settings/tokens</a>
+          amb el permís <code>workflow</code>.
+        </p>
+        <div class="fg">
+          <label class="fl" for="in-pat">GitHub PAT</label>
+          <div style="display:flex; gap:0.5rem;">
+            <input class="fi" id="in-pat" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="flex:1;" />
+            <button class="btn btn-gold" onclick="savePat()">Guardar</button>
+          </div>
+          <p class="fn">Es desa només en aquest navegador (localStorage). Només s'envia a GitHub per disparar el workflow.</p>
+        </div>
+        <div class="msg" id="msg-pat"></div>
+      </div>
+
+      <div class="cfg-sec">
+        <p class="cfg-sec-title">API Key de Groq (opcional, transcripció manual)</p>
+        <p style="font-size:0.92rem; margin-bottom:0.9rem;">
+          Només necessària si vols usar el flux manual (carregar fitxer al navegador).
+          Crea-la gratis a
+          <a href="https://console.groq.com" target="_blank" style="color:var(--gold);">console.groq.com</a>.
         </p>
         <div class="fg">
           <label class="fl" for="in-groq">Groq API Key</label>
@@ -732,58 +809,72 @@
             <input class="fi" id="in-groq" type="password" placeholder="gsk_xxxxxxxxxxxxxxxxxxxx" style="flex:1;" />
             <button class="btn btn-gold" onclick="saveGroqKey()">Guardar</button>
           </div>
-          <p class="fn">Se guarda solo en este navegador (localStorage). Solo se envía a Groq al transcribir.</p>
+          <p class="fn">Es desa només en aquest navegador (localStorage). Només s'envia a Groq en transcriure.</p>
         </div>
         <div class="msg" id="msg-groq"></div>
       </div>
 
       <div class="cfg-sec">
-        <p class="cfg-sec-title">Instalación única</p>
+        <p class="cfg-sec-title">Configuració de GitHub Actions (mode automàtic)</p>
         <p style="font-size:0.9rem; margin-bottom:1rem; color:var(--text-dim);">
-          Solo necesitas esto una vez. Después, cada sesión son ~3 clics.
+          Fes-ho una sola vegada. Després, cada sessió és 1 clic.
         </p>
 
         <div class="inst-step">
           <span class="inst-n">1</span>
           <div class="inst-body">
-            <strong style="color:var(--text-bright);">yt-dlp</strong> — descarga VODs de Twitch
-            <div class="cmd" style="margin-top:0.35rem;">pip install yt-dlp</div>
-            <span style="font-size:0.8rem; color:var(--text-dim);">
-              O descarga el ejecutable en
-              <a href="https://github.com/yt-dlp/yt-dlp/releases/latest" target="_blank">github.com/yt-dlp</a>
-            </span>
+            <strong style="color:var(--text-bright);">Crea el repositori a GitHub</strong>
+            i activa GitHub Pages des de <code>Settings → Pages → Source: /docs</code>.
           </div>
         </div>
 
         <div class="inst-step">
           <span class="inst-n">2</span>
           <div class="inst-body">
-            <strong style="color:var(--text-bright);">ffmpeg</strong> — convierte el audio
-            <div class="cmd" style="margin-top:0.35rem;">sudo apt install ffmpeg</div>
-            <span style="font-size:0.8rem; color:var(--text-dim);">
-              Windows: <code>winget install ffmpeg</code> &nbsp;·&nbsp; macOS: <code>brew install ffmpeg</code>
-            </span>
+            <strong style="color:var(--text-bright);">Afegeix els secrets</strong> a
+            <code>Settings → Secrets → Actions</code>:
+            <ul style="margin-top:0.4rem; padding-left:1.2rem; font-size:0.85rem; color:var(--text-dim);">
+              <li><code>ANTHROPIC_API_KEY</code> — clau de l'API d'Anthropic</li>
+              <li><code>ASSEMBLYAI_API_KEY</code> — clau de
+                <a href="https://www.assemblyai.com/dashboard/api-keys" target="_blank" style="color:var(--gold);">AssemblyAI</a>
+                (~$0.15/h, Universal-2, suport Català natiu)</li>
+            </ul>
           </div>
         </div>
 
         <div class="inst-step">
           <span class="inst-n">3</span>
           <div class="inst-body">
-            <strong style="color:var(--text-bright);">Claude.ai Business</strong> — ya la tienes, no necesitas configurar nada más.
+            <strong style="color:var(--text-bright);">Configura el GitHub PAT</strong> (camp de dalt)
+            per disparar el workflow des d'aquest navegador.
+          </div>
+        </div>
+
+        <div class="inst-step">
+          <span class="inst-n">4</span>
+          <div class="inst-body">
+            <strong style="color:var(--text-bright);">Activa les notificacions</strong> a
+            <code>github.com/[repo] → Watch → All Activity</code> per rebre
+            un correu electrònic quan el recap estigui llest.
           </div>
         </div>
       </div>
 
       <div class="cfg-sec">
-        <p class="cfg-sec-title">Sobre los datos</p>
+        <p class="cfg-sec-title">Sobre els costos</p>
         <p style="font-size:0.88rem; color:var(--text-dim); line-height:1.7;">
-          Los recaps se guardan en el <strong style="color:var(--text);">localStorage</strong> de este navegador —
-          sin base de datos, sin servidor, sin coste.
-          Para hacer una copia de seguridad, abre cualquier recap y usa el botón <strong style="color:var(--text);">Copiar Markdown</strong>.
+          Per a 2 sessions/mes de ~3h en Català:
         </p>
-        <p style="font-size:0.88rem; color:var(--text-dim); margin-top:0.6rem; line-height:1.7;">
-          Coste por sesión: <strong style="color:var(--text);">~$0.05</strong> (solo Groq Whisper).
-          Claude corre sobre tu suscripción Business existente.
+        <ul style="font-size:0.87rem; color:var(--text-dim); padding-left:1.2rem; margin-top:0.5rem; line-height:1.9;">
+          <li><strong style="color:var(--text);">AssemblyAI</strong> (transcripció) — ~$0.15/h × 6h = <strong style="color:var(--text);">~$0.90/mes</strong></li>
+          <li><strong style="color:var(--text);">Claude API</strong> (recap) — ~$0.30-0.50/sessió</li>
+          <li><strong style="color:var(--text);">GitHub Actions + Pages</strong> — gratuït</li>
+        </ul>
+        <p style="font-size:0.88rem; color:var(--text-dim); margin-top:0.75rem; line-height:1.7;">
+          Els recaps es publiquen a GitHub Pages i es guarden al
+          <strong style="color:var(--text);">localStorage</strong> d'aquest navegador.
+          Per fer una còpia de seguretat, obre qualsevol recap i usa el botó
+          <strong style="color:var(--text);">Copiar Markdown</strong>.
         </p>
       </div>
 
@@ -892,6 +983,10 @@ TRANSCRIPCIÓN:
 
     const gk = localStorage.getItem("dnd_groq_key") || "";
     if (gk) document.getElementById("in-groq").value = gk;
+
+    const pat = localStorage.getItem("dnd_github_pat") || "";
+    if (pat) document.getElementById("in-pat").value = pat;
+    if (!pat) document.getElementById("auto-warn").style.display = "block";
 
     // Show resume banner if there's a saved partial transcription
     const partial = loadPartial();
@@ -1342,11 +1437,81 @@ TRANSCRIPCIÓN:
   }
 
   // ── Config ───────────────────────────────────────────────────────────
+  function savePat() {
+    const k = document.getElementById("in-pat").value.trim();
+    if (!k) { showMsg("msg-pat", "Introdueix un PAT.", "err"); return; }
+    localStorage.setItem("dnd_github_pat", k);
+    showMsg("msg-pat", "✓ PAT desat.", "ok");
+    document.getElementById("auto-warn").style.display = "none";
+  }
+
   function saveGroqKey() {
     const k = document.getElementById("in-groq").value.trim();
-    if (!k) { showMsg("msg-groq", "Introduce una API key.", "err"); return; }
+    if (!k) { showMsg("msg-groq", "Introdueix una API key.", "err"); return; }
     localStorage.setItem("dnd_groq_key", k);
-    showMsg("msg-groq", "✓ API key guardada.", "ok");
+    showMsg("msg-groq", "✓ API key desada.", "ok");
+  }
+
+  // ── Mode Automàtic ────────────────────────────────────────────────────
+  async function triggerWorkflow() {
+    const url = document.getElementById("auto-url").value.trim();
+    if (!url) { showMsg("msg-auto", "Introdueix la URL del VOD.", "err"); return; }
+
+    const pat = localStorage.getItem("dnd_github_pat");
+    if (!pat) { showMsg("msg-auto", "Cal configurar el GitHub PAT a ⚙ Config.", "err"); return; }
+
+    let cfg = {};
+    try { cfg = await fetch("config.json?" + Date.now()).then(r => r.json()); } catch (_) {}
+
+    const owner      = cfg.github_owner;
+    const repo       = cfg.github_repo;
+    const workflowId = cfg.workflow_id || "generate-recap.yml";
+
+    if (!owner || !repo) {
+      showMsg("msg-auto", "Falta github_owner/github_repo a config.json.", "err");
+      return;
+    }
+
+    const titulo = document.getElementById("auto-titulo").value.trim();
+    const idioma = document.getElementById("auto-idioma").value;
+
+    const btn = document.getElementById("btn-auto");
+    btn.disabled = true;
+    showMsg("msg-auto", "Enviant…", "info");
+
+    try {
+      const resp = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${pat}`,
+            "Accept": "application/vnd.github.v3+json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ref: "master",
+            inputs: { vod_url: url, titulo, idioma },
+          }),
+        }
+      );
+
+      if (resp.status === 204) {
+        const actionsUrl = `https://github.com/${owner}/${repo}/actions/workflows/${workflowId}`;
+        showMsg("msg-auto", "✓ Workflow engegat! El recap apareixerà al lloc en ~20-30 min. Rebràs una notificació de GitHub quan estigui llest.", "ok");
+        document.getElementById("msg-auto").innerHTML +=
+          ` <a href="${esc(actionsUrl)}" target="_blank" rel="noopener" style="color:var(--green-text);">Seguir el progrés →</a>`;
+        document.getElementById("auto-url").value = "";
+        document.getElementById("auto-titulo").value = "";
+      } else {
+        const errText = await resp.text().catch(() => `HTTP ${resp.status}`);
+        showMsg("msg-auto", `Error ${resp.status}: ${errText}`, "err");
+        btn.disabled = false;
+      }
+    } catch (e) {
+      showMsg("msg-auto", `Error de xarxa: ${e.message}`, "err");
+      btn.disabled = false;
+    }
   }
 
   // ── Step helpers ─────────────────────────────────────────────────────
