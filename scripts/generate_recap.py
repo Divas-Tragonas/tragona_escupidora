@@ -48,7 +48,7 @@ def descargar_audio(url_vod: str, directorio_temp: Path, fitxer_cookies: str | N
         "quiet": False,
         "no_warnings": False,
         # Node.js és pre-instal·lat a ubuntu-latest; necessari per resoldre JS challenge de YouTube
-        "js_runtimes": "node",
+        "js_runtimes": {"node": {}},
     }
 
     if fitxer_cookies:
