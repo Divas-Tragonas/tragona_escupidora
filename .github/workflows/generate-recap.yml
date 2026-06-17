@@ -1,6 +1,5 @@
-name: 📜 Generar Recap D&D
+name: 📝 Transcriure Sessió D&D
 
-# Es dispara manualment des de la web (via API) o des de la pestanya Actions de GitHub
 on:
   workflow_dispatch:
     inputs:
@@ -8,13 +7,13 @@ on:
         description: "URL del VOD de Twitch"
         required: true
         type: string
-      titulo:
-        description: "Títol de la sessió (opcional — es genera automàticament si es deixa buit)"
+      titol:
+        description: "Títol de la sessió (opcional)"
         required: false
         default: ""
         type: string
       idioma:
-        description: "Idioma de l'àudio per a Rev.ai"
+        description: "Idioma de l'àudio"
         required: false
         default: "ca"
         type: choice
@@ -28,8 +27,8 @@ on:
           - it
 
 jobs:
-  generar-recap:
-    name: Generar recap des de VOD
+  transcriure:
+    name: Transcriure VOD amb AssemblyAI
     runs-on: ubuntu-latest
 
     permissions:
@@ -37,13 +36,11 @@ jobs:
       issues: write
 
     steps:
-      # ── 1. Clonar el repositori ───────────────────────────────────────
       - name: Clonar repositori
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 2. Configurar Python ─────────────────────────────────────────
       - name: Configurar Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -51,66 +48,76 @@ jobs:
           cache: "pip"
           cache-dependency-path: scripts/requirements.txt
 
-      # ── 3. Instalar ffmpeg (necessari per yt-dlp) ─────────────────────
       - name: Instalar ffmpeg
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg
-          ffmpeg -version | head -1
 
-      # ── 4. Instalar dependències Python ───────────────────────────────
       - name: Instalar dependències Python
         run: pip install -r scripts/requirements.txt
 
-      # ── 5. Executar el generador de recap ─────────────────────────────
-      - name: Generar recap
+      - name: Transcriure sessió
+        id: transcriure
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ASSEMBLYAI_API_KEY: ${{ secrets.ASSEMBLYAI_API_KEY }}
         run: |
           python scripts/generate_recap.py \
-            --url "${{ github.event.inputs.vod_url }}" \
-            --titulo "${{ github.event.inputs.titulo }}" \
+            --url    "${{ github.event.inputs.vod_url }}" \
+            --titol  "${{ github.event.inputs.titol }}" \
             --idioma "${{ github.event.inputs.idioma }}" \
-            --salida docs/recaps
+            --salida docs/transcripts
 
-      # ── 6. Commit i push ──────────────────────────────────────────────
-      - name: Publicar recap a GitHub Pages
+      - name: Publicar transcripció
         run: |
           git config user.name  "Cronista de la Masmorra"
           git config user.email "actions@github.com"
 
-          git add docs/recaps/ docs/recaps.json
+          git add docs/transcripts/
 
           if git diff --staged --quiet; then
-            echo "No hi ha canvis. El recap potser ja existia."
+            echo "Cap canvi per commitear."
             exit 0
           fi
 
           FECHA=$(date +"%Y-%m-%d")
-          git commit -m "📜 Nou recap: ${FECHA}"
+          git commit -m "📝 Nova transcripció: ${FECHA}"
           git push origin master
 
-      # ── 7. Notificació quan el recap és llest ─────────────────────────
-      - name: Notificar recap llest
+      - name: Notificar transcripció llesta
         if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REPO="${{ github.repository }}"
+          OWNER="${{ github.repository_owner }}"
+          REPO_NAME="${{ github.event.repository.name }}"
           FECHA=$(date +"%Y-%m-%d")
-          TITOL="${{ github.event.inputs.titulo }}"
+          TITOL="${{ github.event.inputs.titol }}"
           if [ -z "$TITOL" ]; then TITOL="Sessió del ${FECHA}"; fi
+
+          # Buscar el fitxer de transcripció generat
+          TRANSCRIPT_FILE=$(find docs/transcripts -name "${FECHA}*.txt" | head -1)
+          RAW_URL="https://raw.githubusercontent.com/${REPO}/master/${TRANSCRIPT_FILE}"
+          WIZARD_URL="https://${OWNER}.github.io/${REPO_NAME}/"
 
           gh issue create \
             --repo "$REPO" \
-            --title "✅ Recap llest: ${TITOL}" \
-            --body "El recap de la sessió **${TITOL}** s'ha generat i publicat.
+            --title "📝 Transcripció llesta: ${TITOL}" \
+            --body "La transcripció de **${TITOL}** ja és disponible.
 
-          📖 **Ves al lloc:** https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          **Pròxim pas:**
+          1. Obre el fitxer de transcripció, selecciona-ho tot i copia-ho
+          2. Ves al wizard → Nova Sessió → Pas 2 → pestanya **Enganxar transcripció**
+          3. Pega la transcripció i segueix els passos per generar el recap amb Claude
+
+          📄 **Fitxer de transcripció (copia el contingut):**
+          \`${TRANSCRIPT_FILE}\`
+          👉 [Obrir fitxer raw](${RAW_URL})
+
+          🌐 **Wizard:** ${WIZARD_URL}
 
           🎥 **VOD:** ${{ github.event.inputs.vod_url }}
 
           ---
-          *Generat automàticament per GitHub Actions el ${FECHA}*" \
+          *Transcrit automàticament per GitHub Actions el ${FECHA}*" \
             --label "recap" 2>/dev/null || true

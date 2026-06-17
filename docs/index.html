@@ -499,9 +499,10 @@
             Cal configurar el <strong>GitHub Personal Access Token</strong> a ⚙ Config per usar el mode automàtic.
           </div>
           <p class="note">
-            Introdueix la URL del VOD i deixa que GitHub Actions descarregui l'àudio, el
-            transcrigui amb <strong>AssemblyAI</strong> (Català natiu) i generi el recap —
-            tot automàticament. Rebràs una notificació per correu quan estigui llest (~20-30 min).
+            Introdueix la URL del VOD i deixa que GitHub Actions descarregui l'àudio i el
+            transcrigui amb <strong>AssemblyAI</strong> (Català natiu) —
+            automàticament. Rebràs un correu amb la transcripció en ~15-20 min.
+            Llavors copia-la al <strong>Pas 2 → Enganxar transcripció</strong> i genera el recap amb Claude.ai.
           </p>
 
           <div class="fg">
@@ -834,7 +835,6 @@
             <strong style="color:var(--text-bright);">Afegeix els secrets</strong> a
             <code>Settings → Secrets → Actions</code>:
             <ul style="margin-top:0.4rem; padding-left:1.2rem; font-size:0.85rem; color:var(--text-dim);">
-              <li><code>ANTHROPIC_API_KEY</code> — clau de l'API d'Anthropic</li>
               <li><code>ASSEMBLYAI_API_KEY</code> — clau de
                 <a href="https://www.assemblyai.com/dashboard/api-keys" target="_blank" style="color:var(--gold);">AssemblyAI</a>
                 (~$0.15/h, Universal-2, suport Català natiu)</li>
@@ -867,7 +867,7 @@
         </p>
         <ul style="font-size:0.87rem; color:var(--text-dim); padding-left:1.2rem; margin-top:0.5rem; line-height:1.9;">
           <li><strong style="color:var(--text);">AssemblyAI</strong> (transcripció) — ~$0.15/h × 6h = <strong style="color:var(--text);">~$0.90/mes</strong></li>
-          <li><strong style="color:var(--text);">Claude API</strong> (recap) — ~$0.30-0.50/sessió</li>
+          <li><strong style="color:var(--text);">Claude.ai</strong> (recap) — <strong style="color:var(--text);">inclòs a la subscripció</strong>, sense cost addicional d'API</li>
           <li><strong style="color:var(--text);">GitHub Actions + Pages</strong> — gratuït</li>
         </ul>
         <p style="font-size:0.88rem; color:var(--text-dim); margin-top:0.75rem; line-height:1.7;">
